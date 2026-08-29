@@ -1,6 +1,6 @@
 [submodule "px4/PX4-Autopilot"]
 	path = px4/PX4-Autopilot
-	url = https://github.com/ANCL/PX4-Autopilot.git
+	url = https://github.com/yliu213/PX4-Autopilot-slungload.git
 
 [submodule "ros2_ws/src/px4_msgs"]
 	path = ros2_ws/src/px4_msgs
