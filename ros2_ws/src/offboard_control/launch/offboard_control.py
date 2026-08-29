@@ -55,6 +55,7 @@ def generate_launch_description():
         output="screen",
         parameters=[{
             "control_mode": control_mode,
+            "flight_path": flight_path,
             "use_sim": use_sim,
             "use_ekf": use_ekf,
             "Kp": kp,

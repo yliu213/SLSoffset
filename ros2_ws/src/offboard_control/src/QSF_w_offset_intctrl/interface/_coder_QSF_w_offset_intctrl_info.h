@@ -1,21 +1,22 @@
 //
-// Academic License - for use in teaching, academic research, and meeting
-// course requirements at degree granting institutions only.  Not for
-// government, commercial, or other organizational use.
+// File: _coder_QSF_w_offset_intctrl_info.h
 //
-// _coder_QSF_w_offset_intctrl_info.h
-//
-// Code generation for function 'QSF_w_offset_intctrl'
+// MATLAB Coder version            : 26.1
+// C/C++ source code generated on  : 26-Aug-2026 16:37:47
 //
 
 #ifndef _CODER_QSF_W_OFFSET_INTCTRL_INFO_H
 #define _CODER_QSF_W_OFFSET_INTCTRL_INFO_H
 
-// Include files
+// Include Files
 #include "mex.h"
 
 // Function Declarations
 MEXFUNCTION_LINKAGE mxArray *emlrtMexFcnProperties();
 
 #endif
-// End of code generation (_coder_QSF_w_offset_intctrl_info.h)
+//
+// File trailer for _coder_QSF_w_offset_intctrl_info.h
+//
+// [EOF]
+//

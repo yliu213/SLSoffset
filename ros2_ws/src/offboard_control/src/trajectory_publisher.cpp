@@ -126,6 +126,8 @@ class TrajectoryPublisher : public rclcpp::Node {
         ref.position = Eigen::Vector3d(A * s, B * s * c, z_ref);
         ref.velocity = Eigen::Vector3d(A * omega * c, B * omega * (c * c - s * s), 0.0);
         ref.acceleration = Eigen::Vector3d(-A * omega * omega * s, -4.0 * B * omega * omega * s * c, 0.0);
+        ref.jerk = Eigen::Vector3d(-A * omega * omega * omega * c, -4.0 * B * omega * omega * omega * (c * c - s * s), 0.0);
+        ref.snap = Eigen::Vector3d(A * std::pow(omega, 4) * s, 16.0 * B * std::pow(omega, 4) * s * c, 0.0); // newly added
         ref.yaw = 0.0f;
 
         return ref;
@@ -183,6 +185,8 @@ class TrajectoryPublisher : public rclcpp::Node {
 
         ref.velocity = Eigen::Vector3d(0.0, 0.0, 0.0);
         ref.acceleration = Eigen::Vector3d(0.0, 0.0, 0.0);
+        ref.jerk = Eigen::Vector3d(0.0, 0.0, 0.0);
+        ref.snap = Eigen::Vector3d(0.0, 0.0, 0.0);
         ref.yaw = 0.0f;
 
         // wrap the time to a 80-second repeating period
@@ -207,6 +211,8 @@ class TrajectoryPublisher : public rclcpp::Node {
         ref.position = Eigen::Vector3d(x, y, z);
         ref.velocity = Eigen::Vector3d(0.0, 0.0, 0.0);
         ref.acceleration = Eigen::Vector3d(0.0, 0.0, 0.0);
+        ref.jerk = Eigen::Vector3d(0.0, 0.0, 0.0);
+        ref.snap = Eigen::Vector3d(0.0, 0.0, 0.0);
         ref.yaw = 0.0f;
 
         return ref;

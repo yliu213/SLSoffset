@@ -1,18 +1,19 @@
 //
-// Academic License - for use in teaching, academic research, and meeting
-// course requirements at degree granting institutions only.  Not for
-// government, commercial, or other organizational use.
+// File: QSF_w_offset_intctrl_types.h
 //
-// QSF_w_offset_intctrl_types.h
-//
-// Code generation for function 'QSF_w_offset_intctrl'
+// MATLAB Coder version            : 26.1
+// C/C++ source code generated on  : 26-Aug-2026 16:37:47
 //
 
 #ifndef QSF_W_OFFSET_INTCTRL_TYPES_H
 #define QSF_W_OFFSET_INTCTRL_TYPES_H
 
-// Include files
+// Include Files
 #include "rtwtypes.h"
 
 #endif
-// End of code generation (QSF_w_offset_intctrl_types.h)
+//
+// File trailer for QSF_w_offset_intctrl_types.h
+//
+// [EOF]
+//

@@ -1,17 +1,14 @@
 //
-// Academic License - for use in teaching, academic research, and meeting
-// course requirements at degree granting institutions only.  Not for
-// government, commercial, or other organizational use.
+// File: rt_nonfinite.h
 //
-// rt_nonfinite.h
-//
-// Code generation for function 'QSF_w_offset_intctrl'
+// MATLAB Coder version            : 26.1
+// C/C++ source code generated on  : 26-Aug-2026 16:37:47
 //
 
 #ifndef RT_NONFINITE_H
 #define RT_NONFINITE_H
 
-// Include files
+// Include Files
 #include "rtwtypes.h"
 
 #ifdef __cplusplus
@@ -29,4 +26,8 @@ extern real32_T rtNaNF;
 }
 #endif
 #endif
-// End of code generation (rt_nonfinite.h)
+//
+// File trailer for rt_nonfinite.h
+//
+// [EOF]
+//

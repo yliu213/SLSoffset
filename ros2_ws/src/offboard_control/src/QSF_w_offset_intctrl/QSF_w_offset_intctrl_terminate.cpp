@@ -1,20 +1,25 @@
 //
-// Academic License - for use in teaching, academic research, and meeting
-// course requirements at degree granting institutions only.  Not for
-// government, commercial, or other organizational use.
+// File: QSF_w_offset_intctrl_terminate.cpp
 //
-// QSF_w_offset_intctrl_terminate.cpp
-//
-// Code generation for function 'QSF_w_offset_intctrl_terminate'
+// MATLAB Coder version            : 26.1
+// C/C++ source code generated on  : 26-Aug-2026 16:37:47
 //
 
-// Include files
+// Include Files
 #include "QSF_w_offset_intctrl_terminate.h"
 #include "rt_nonfinite.h"
 
 // Function Definitions
+//
+// Arguments    : void
+// Return Type  : void
+//
 void QSF_w_offset_intctrl_terminate()
 {
 }
 
-// End of code generation (QSF_w_offset_intctrl_terminate.cpp)
+//
+// File trailer for QSF_w_offset_intctrl_terminate.cpp
+//
+// [EOF]
+//

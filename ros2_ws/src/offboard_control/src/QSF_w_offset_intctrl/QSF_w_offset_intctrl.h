@@ -1,17 +1,14 @@
 //
-// Academic License - for use in teaching, academic research, and meeting
-// course requirements at degree granting institutions only.  Not for
-// government, commercial, or other organizational use.
+// File: QSF_w_offset_intctrl.h
 //
-// QSF_w_offset_intctrl.h
-//
-// Code generation for function 'QSF_w_offset_intctrl'
+// MATLAB Coder version            : 26.1
+// C/C++ source code generated on  : 26-Aug-2026 16:37:47
 //
 
 #ifndef QSF_W_OFFSET_INTCTRL_H
 #define QSF_W_OFFSET_INTCTRL_H
 
-// Include files
+// Include Files
 #include "rtwtypes.h"
 #include <cstddef>
 #include <cstdlib>
@@ -21,9 +18,13 @@ extern void QSF_w_offset_intctrl(double mp, double mq, double l, double g,
                                  const double K1[5], const double K2[5],
                                  const double K3[3], const double ref_traj[15],
                                  const double states[12], double psi,
-                                 const double aL[3], const double Int[3],
+                                 const double aLd[3], const double Int[3],
                                  double Rbd[9], double *Fld_scaler,
                                  double *phid, double *thetad);
 
 #endif
-// End of code generation (QSF_w_offset_intctrl.h)
+//
+// File trailer for QSF_w_offset_intctrl.h
+//
+// [EOF]
+//

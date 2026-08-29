@@ -1,16 +1,13 @@
 //
-// Academic License - for use in teaching, academic research, and meeting
-// course requirements at degree granting institutions only.  Not for
-// government, commercial, or other organizational use.
+// File: rtGetNaN.cpp
 //
-// rtGetNaN.cpp
-//
-// Code generation for function 'QSF_w_offset_intctrl'
+// MATLAB Coder version            : 26.1
+// C/C++ source code generated on  : 26-Aug-2026 16:37:47
 //
 
 // Abstract:
 //       MATLAB for code generation function to initialize non-finite, NaN
-// Include files
+// Include Files
 #include "rtGetNaN.h"
 #include "rt_nonfinite.h"
 
@@ -34,4 +31,8 @@ real32_T rtGetNaNF(void)
   return rtNaNF;
 }
 
-// End of code generation (rtGetNaN.cpp)
+//
+// File trailer for rtGetNaN.cpp
+//
+// [EOF]
+//

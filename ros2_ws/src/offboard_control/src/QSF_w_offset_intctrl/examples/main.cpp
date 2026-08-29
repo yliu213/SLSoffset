@@ -1,11 +1,8 @@
 //
-// Academic License - for use in teaching, academic research, and meeting
-// course requirements at degree granting institutions only.  Not for
-// government, commercial, or other organizational use.
+// File: main.cpp
 //
-// main.cpp
-//
-// Code generation for function 'main'
+// MATLAB Coder version            : 26.1
+// C/C++ source code generated on  : 26-Aug-2026 16:37:47
 //
 
 /*************************************************************************/
@@ -33,9 +30,10 @@
 /*                                                                       */
 /*************************************************************************/
 
-// Include files
+// Include Files
 #include "main.h"
 #include "QSF_w_offset_intctrl.h"
+#include "QSF_w_offset_intctrl_initialize.h"
 #include "QSF_w_offset_intctrl_terminate.h"
 #include "rt_nonfinite.h"
 
@@ -51,6 +49,10 @@ static void argInit_1x5_real_T(double result[5]);
 static double argInit_real_T();
 
 // Function Definitions
+//
+// Arguments    : double result[12]
+// Return Type  : void
+//
 static void argInit_12x1_real_T(double result[12])
 {
   // Loop over the array to initialize each element.
@@ -61,6 +63,10 @@ static void argInit_12x1_real_T(double result[12])
   }
 }
 
+//
+// Arguments    : double result[15]
+// Return Type  : void
+//
 static void argInit_15x1_real_T(double result[15])
 {
   // Loop over the array to initialize each element.
@@ -71,6 +77,10 @@ static void argInit_15x1_real_T(double result[15])
   }
 }
 
+//
+// Arguments    : double result[3]
+// Return Type  : void
+//
 static void argInit_1x3_real_T(double result[3])
 {
   // Loop over the array to initialize each element.
@@ -81,6 +91,10 @@ static void argInit_1x3_real_T(double result[3])
   }
 }
 
+//
+// Arguments    : double result[5]
+// Return Type  : void
+//
 static void argInit_1x5_real_T(double result[5])
 {
   // Loop over the array to initialize each element.
@@ -91,16 +105,26 @@ static void argInit_1x5_real_T(double result[5])
   }
 }
 
+//
+// Arguments    : void
+// Return Type  : double
+//
 static double argInit_real_T()
 {
   return 0.0;
 }
 
+//
+// Arguments    : int argc
+//                char **argv
+// Return Type  : int
+//
 int main(int, char **)
 {
-  // The initialize function is being called automatically from your entry-point
-  // function. So, a call to initialize is not included here. Invoke the
-  // entry-point functions.
+  // Initialize the application.
+  // You do not need to do this more than one time.
+  QSF_w_offset_intctrl_initialize();
+  // Invoke the entry-point functions.
   // You can call entry-point functions multiple times.
   main_QSF_w_offset_intctrl();
   // Terminate the application.
@@ -109,13 +133,17 @@ int main(int, char **)
   return 0;
 }
 
+//
+// Arguments    : void
+// Return Type  : void
+//
 void main_QSF_w_offset_intctrl()
 {
   double dv1[15];
   double dv2[12];
   double Rbd[9];
   double K1_tmp[5];
-  double aL_tmp[3];
+  double aLd_tmp[3];
   double dv[3];
   double Fld_scaler;
   double mp_tmp;
@@ -129,16 +157,20 @@ void main_QSF_w_offset_intctrl()
   // Initialize function input argument 'K3'.
   // Initialize function input argument 'ref_traj'.
   // Initialize function input argument 'states'.
-  // Initialize function input argument 'aL'.
-  argInit_1x3_real_T(aL_tmp);
+  // Initialize function input argument 'aLd'.
+  argInit_1x3_real_T(aLd_tmp);
   // Initialize function input argument 'Int'.
   // Call the entry-point 'QSF_w_offset_intctrl'.
   argInit_1x3_real_T(dv);
   argInit_15x1_real_T(dv1);
   argInit_12x1_real_T(dv2);
   QSF_w_offset_intctrl(mp_tmp, mp_tmp, mp_tmp, mp_tmp, K1_tmp, K1_tmp, dv, dv1,
-                       dv2, mp_tmp, aL_tmp, aL_tmp, Rbd, &Fld_scaler, &phid,
+                       dv2, mp_tmp, aLd_tmp, aLd_tmp, Rbd, &Fld_scaler, &phid,
                        &thetad);
 }
 
-// End of code generation (main.cpp)
+//
+// File trailer for main.cpp
+//
+// [EOF]
+//

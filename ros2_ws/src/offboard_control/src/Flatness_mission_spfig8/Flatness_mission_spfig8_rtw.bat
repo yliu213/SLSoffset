@@ -7,7 +7,7 @@ call "setup_msvc.bat"
 
 cd .
 
-if "%1"=="" (nmake  -f QSF_w_offset_intctrl_rtw.mk all) else (nmake  -f QSF_w_offset_intctrl_rtw.mk %1)
+if "%1"=="" (nmake  -f Flatness_mission_spfig8_rtw.mk all) else (nmake  -f Flatness_mission_spfig8_rtw.mk %1)
 @if errorlevel 1 goto error_exit
 
 exit /B 0

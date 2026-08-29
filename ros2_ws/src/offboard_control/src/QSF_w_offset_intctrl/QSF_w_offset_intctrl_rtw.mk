@@ -1,9 +1,9 @@
-﻿###########################################################################
+###########################################################################
 ## Makefile generated for component 'QSF_w_offset_intctrl'. 
 ## 
 ## Makefile     : QSF_w_offset_intctrl_rtw.mk
-## Generated on : Fri Feb 13 15:43:32 2026
-## Final product: .\QSF_w_offset_intctrl.lib
+## Generated on : Wed Aug 26 22:38:04 2026
+## Final product: ./QSF_w_offset_intctrl.a
 ## Product type : static-library
 ## 
 ###########################################################################
@@ -15,88 +15,99 @@
 # Macro Descriptions:
 # PRODUCT_NAME            Name of the system to build
 # MAKEFILE                Name of this makefile
-# COMPILER_COMMAND_FILE   Compiler command listing model reference header paths
-# CMD_FILE                Command file
 # MODELLIB                Static library target
 
 PRODUCT_NAME              = QSF_w_offset_intctrl
 MAKEFILE                  = QSF_w_offset_intctrl_rtw.mk
-MATLAB_ROOT               = C:\PROGRA~1\MATLAB\R2024a
-MATLAB_BIN                = C:\PROGRA~1\MATLAB\R2024a\bin
-MATLAB_ARCH_BIN           = $(MATLAB_BIN)\win64
-START_DIR                 = Z:\QSF_w_offset\ode89\F model
+MATLAB_ROOT               = /MATLAB
+MATLAB_BIN                = /MATLAB/bin
+MATLAB_ARCH_BIN           = $(MATLAB_BIN)/glnxa64
+START_DIR                 = /MATLAB\ Drive/F\ model
 TGT_FCN_LIB               = ISO_C++11
 SOLVER_OBJ                = 
 CLASSIC_INTERFACE         = 0
 MODEL_HAS_DYNAMICALLY_LOADED_SFCNS = 
-RELATIVE_PATH_TO_ANCHOR   = ..\..\..
-COMPILER_COMMAND_FILE     = QSF_w_offset_intctrl_rtw_comp.rsp
-CMD_FILE                  = QSF_w_offset_intctrl_rtw.rsp
-C_STANDARD_OPTS           = 
-CPP_STANDARD_OPTS         = 
-NODEBUG                   = 1
-MODELLIB                  = QSF_w_offset_intctrl.lib
+RELATIVE_PATH_TO_ANCHOR   = ../../..
+C_STANDARD_OPTS           = -fwrapv
+CPP_STANDARD_OPTS         = -fwrapv
+MODELLIB                  = QSF_w_offset_intctrl.a
 
 ###########################################################################
 ## TOOLCHAIN SPECIFICATIONS
 ###########################################################################
 
-# Toolchain Name:          Microsoft Visual C++ 2022 v17.0 | nmake (64-bit Windows)
-# Supported Version(s):    17.0
-# ToolchainInfo Version:   2024a
+# Toolchain Name:          GNU gcc/g++ | gmake (64-bit Linux)
+# Supported Version(s):    
+# ToolchainInfo Version:   2026a
 # Specification Revision:  1.0
 # 
 #-------------------------------------------
 # Macros assumed to be defined elsewhere
 #-------------------------------------------
 
-# NODEBUG
-# cvarsdll
-# cvarsmt
-# conlibsmt
-# ldebug
-# conflags
-# cflags
+# C_STANDARD_OPTS
+# CPP_STANDARD_OPTS
 
 #-----------
 # MACROS
 #-----------
 
-MW_EXTERNLIB_DIR    = $(MATLAB_ROOT)\extern\lib\win64\microsoft
-MW_LIB_DIR          = $(MATLAB_ROOT)\lib\win64
-CPU                 = AMD64
-APPVER              = 5.02
-CVARSFLAG           = $(cvarsmt)
-CFLAGS_ADDITIONAL   = -D_CRT_SECURE_NO_WARNINGS
-CPPFLAGS_ADDITIONAL = -EHs -D_CRT_SECURE_NO_WARNINGS /wd4251 /Zc:__cplusplus
-LIBS_TOOLCHAIN      = $(conlibs)
+WARN_FLAGS         = -Wall -W -Wwrite-strings -Winline -Wstrict-prototypes -Wnested-externs -Wpointer-arith -Wcast-align -Wno-stringop-overflow
+WARN_FLAGS_MAX     = $(WARN_FLAGS) -Wcast-qual -Wshadow
+CPP_WARN_FLAGS     = -Wall -W -Wwrite-strings -Winline -Wpointer-arith -Wcast-align -Wno-stringop-overflow
+CPP_WARN_FLAGS_MAX = $(CPP_WARN_FLAGS) -Wcast-qual -Wshadow
 
 TOOLCHAIN_SRCS = 
 TOOLCHAIN_INCS = 
 TOOLCHAIN_LIBS = 
 
+FORMAT_FOR_ECHO_SH               = ""'$1'
+FORMAT_FOR_ECHO                  = $(FORMAT_FOR_ECHO_SH)
+HASH                             = \#
+SEMICOLON                        = ;
+OPEN_PAREN                       = (
+CLOSE_PAREN                      = )
+ESCAPE_SPECIAL_CHARS             = $(strip $(subst $(CLOSE_PAREN),\$(CLOSE_PAREN),\
+	$(subst $(OPEN_PAREN),\$(OPEN_PAREN),\
+	$(subst &,\&,\
+	$(subst ~,\~,\
+	$(subst ?,\?,\
+	$(subst *,\*,\
+	$(subst },\},\
+	$(subst {,\{,\
+	$(subst >,\>,\
+	$(subst <,\<,\
+	$(subst !,\!,\
+	$(subst ],\],\
+	$(subst [,\[,\
+	$(subst $(HASH),\$(HASH),\
+	$(subst \\,\\\,\
+	$(subst ',\',\
+	$(subst ",\",\
+	$1))))))))))))))))))
+
 #------------------------
 # BUILD TOOL COMMANDS
 #------------------------
 
-# C Compiler: Microsoft Visual C Compiler
-CC = cl
+# C Compiler: GNU C Compiler
+CC = gcc
 
-# Linker: Microsoft Visual C Linker
-LD = link
+# Linker: GNU Linker
+LD = g++
 
-# C++ Compiler: Microsoft Visual C++ Compiler
-CPP = cl
+# C++ Compiler: GNU C++ Compiler
+CPP = g++
 
-# C++ Linker: Microsoft Visual C++ Linker
-CPP_LD = link
+# C++ Linker: GNU C++ Linker
+CPP_LD = g++
 
-# Archiver: Microsoft Visual C/C++ Archiver
-AR = lib
+# Archiver: GNU Archiver
+AR = ar
 
 # MEX Tool: MEX Tool
 MEX_PATH = $(MATLAB_ARCH_BIN)
-MEX = "$(MEX_PATH)\mex"
+MEX = "$(MEX_PATH)/mex"
 
 # Download: Download
 DOWNLOAD =
@@ -104,52 +115,51 @@ DOWNLOAD =
 # Execute: Execute
 EXECUTE = $(PRODUCT)
 
-# Builder: NMAKE Utility
-MAKE = nmake
+# Builder: GMAKE Utility
+MAKE_PATH = %MATLAB%/bin/glnxa64
+MAKE = "$(MAKE_PATH)/gmake"
 
 
 #-------------------------
 # Directives/Utilities
 #-------------------------
 
-CDEBUG              = -Zi
-C_OUTPUT_FLAG       = -Fo
-LDDEBUG             = /DEBUG
-OUTPUT_FLAG         = -out:
-CPPDEBUG            = -Zi
-CPP_OUTPUT_FLAG     = -Fo
-CPPLDDEBUG          = /DEBUG
-OUTPUT_FLAG         = -out:
+CDEBUG              = -g
+C_OUTPUT_FLAG       = -o
+LDDEBUG             = -g
+OUTPUT_FLAG         = -o
+CPPDEBUG            = -g
+CPP_OUTPUT_FLAG     = -o
+CPPLDDEBUG          = -g
+OUTPUT_FLAG         = -o
 ARDEBUG             =
-STATICLIB_OUTPUT_FLAG = -out:
+STATICLIB_OUTPUT_FLAG =
 MEX_DEBUG           = -g
-RM                  = @del
+RM                  = @rm -f
 ECHO                = @echo
-MV                  = @ren
-RUN                 = @cmd /C
+MV                  = @mv
+RUN                 =
 
 #--------------------------------------
 # "Faster Runs" Build Configuration
 #--------------------------------------
 
-ARFLAGS              = /nologo
-CFLAGS               = $(cflags) $(CVARSFLAG) $(CFLAGS_ADDITIONAL) \
-                       /O2 /Oy-
-CPPFLAGS             = /TP $(cflags) $(CVARSFLAG) $(CPPFLAGS_ADDITIONAL) \
-                       /O2 /Oy-
-CPP_LDFLAGS          = $(ldebug) $(conflags) $(LIBS_TOOLCHAIN)
-CPP_SHAREDLIB_LDFLAGS  = $(ldebug) $(conflags) $(LIBS_TOOLCHAIN) \
-                         -dll -def:$(DEF_FILE)
+ARFLAGS              = ruvs
+CFLAGS               = -c $(C_STANDARD_OPTS) -fPIC \
+                       -O3
+CPPFLAGS             = -c $(CPP_STANDARD_OPTS) -fPIC \
+                       -O3
+CPP_LDFLAGS          =
+CPP_SHAREDLIB_LDFLAGS  = -shared -Wl,--no-undefined
 DOWNLOAD_FLAGS       =
 EXECUTE_FLAGS        =
-LDFLAGS              = $(ldebug) $(conflags) $(LIBS_TOOLCHAIN)
+LDFLAGS              =
 MEX_CPPFLAGS         =
 MEX_CPPLDFLAGS       =
 MEX_CFLAGS           =
 MEX_LDFLAGS          =
-MAKE_FLAGS           = -f $(MAKEFILE)
-SHAREDLIB_LDFLAGS    = $(ldebug) $(conflags) $(LIBS_TOOLCHAIN) \
-                       -dll -def:$(DEF_FILE)
+MAKE_FLAGS           = -j $(MAX_MAKE_JOBS) -l $(MAX_MAKE_LOAD_AVG) -f $(MAKEFILE)
+SHAREDLIB_LDFLAGS    = -shared -Wl,--no-undefined
 
 
 
@@ -157,7 +167,7 @@ SHAREDLIB_LDFLAGS    = $(ldebug) $(conflags) $(LIBS_TOOLCHAIN) \
 ## OUTPUT INFO
 ###########################################################################
 
-PRODUCT = .\QSF_w_offset_intctrl.lib
+PRODUCT = ./QSF_w_offset_intctrl.a
 PRODUCT_TYPE = "static-library"
 BUILD_TYPE = "Static Library"
 
@@ -165,7 +175,7 @@ BUILD_TYPE = "Static Library"
 ## INCLUDE PATHS
 ###########################################################################
 
-INCLUDES_BUILDINFO = 
+INCLUDES_BUILDINFO = -I$(START_DIR)/codegen/lib/QSF_w_offset_intctrl -I$(START_DIR) -I$(MATLAB_ROOT)/extern/include
 
 INCLUDES = $(INCLUDES_BUILDINFO)
 
@@ -182,7 +192,7 @@ DEFINES = $(DEFINES_CUSTOM) $(DEFINES_STANDARD)
 ## SOURCE FILES
 ###########################################################################
 
-SRCS = $(START_DIR)\codegen\lib\QSF_w_offset_intctrl\rt_nonfinite.cpp $(START_DIR)\codegen\lib\QSF_w_offset_intctrl\rtGetNaN.cpp $(START_DIR)\codegen\lib\QSF_w_offset_intctrl\rtGetInf.cpp $(START_DIR)\codegen\lib\QSF_w_offset_intctrl\QSF_w_offset_intctrl_initialize.cpp $(START_DIR)\codegen\lib\QSF_w_offset_intctrl\QSF_w_offset_intctrl_terminate.cpp $(START_DIR)\codegen\lib\QSF_w_offset_intctrl\QSF_w_offset_intctrl.cpp
+SRCS = $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/rt_nonfinite.cpp $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/rtGetNaN.cpp $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/rtGetInf.cpp $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/QSF_w_offset_intctrl_initialize.cpp $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/QSF_w_offset_intctrl_terminate.cpp $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/QSF_w_offset_intctrl.cpp $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/norm.cpp
 
 ALL_SRCS = $(SRCS)
 
@@ -190,7 +200,7 @@ ALL_SRCS = $(SRCS)
 ## OBJECTS
 ###########################################################################
 
-OBJS = rt_nonfinite.obj rtGetNaN.obj rtGetInf.obj QSF_w_offset_intctrl_initialize.obj QSF_w_offset_intctrl_terminate.obj QSF_w_offset_intctrl.obj
+OBJS = rt_nonfinite.o rtGetNaN.o rtGetInf.o QSF_w_offset_intctrl_initialize.o QSF_w_offset_intctrl_terminate.o QSF_w_offset_intctrl.o norm.o
 
 ALL_OBJS = $(OBJS)
 
@@ -210,7 +220,7 @@ LIBS =
 ## SYSTEM LIBRARIES
 ###########################################################################
 
-SYSTEM_LIBS = 
+SYSTEM_LIBS =  -lm
 
 ###########################################################################
 ## ADDITIONAL TOOLCHAIN FLAGS
@@ -220,40 +230,36 @@ SYSTEM_LIBS =
 # C Compiler
 #---------------
 
-CFLAGS_ = /source-charset:utf-8
-CFLAGS_BASIC = $(DEFINES) @$(COMPILER_COMMAND_FILE)
+CFLAGS_TFL = -msse2 -fno-predictive-commoning
+CFLAGS_BASIC = $(DEFINES) $(INCLUDES)
 
-CFLAGS = $(CFLAGS) $(CFLAGS_) $(CFLAGS_BASIC)
+CFLAGS += $(CFLAGS_TFL) $(CFLAGS_BASIC)
 
 #-----------------
 # C++ Compiler
 #-----------------
 
-CPPFLAGS_ = /source-charset:utf-8
-CPPFLAGS_BASIC = $(DEFINES) @$(COMPILER_COMMAND_FILE)
+CPPFLAGS_TFL = -msse2 -fno-predictive-commoning
+CPPFLAGS_BASIC = $(DEFINES) $(INCLUDES)
 
-CPPFLAGS = $(CPPFLAGS) $(CPPFLAGS_) $(CPPFLAGS_BASIC)
+CPPFLAGS += $(CPPFLAGS_TFL) $(CPPFLAGS_BASIC)
 
 ###########################################################################
 ## INLINED COMMANDS
 ###########################################################################
 
-
-!include $(MATLAB_ROOT)\rtw\c\tools\vcdefs.mak
-
-
 ###########################################################################
 ## PHONY TARGETS
 ###########################################################################
 
-.PHONY : all build clean info prebuild download execute set_environment_variables
+.PHONY : all build clean info prebuild download execute
 
 
 all : build
-	@cmd /C "@echo ### Successfully generated all binary outputs."
+	@echo $(call FORMAT_FOR_ECHO,### Successfully generated all binary outputs.)
 
 
-build : set_environment_variables prebuild $(PRODUCT)
+build : prebuild $(PRODUCT)
 
 
 prebuild : 
@@ -265,11 +271,6 @@ download : $(PRODUCT)
 execute : download
 
 
-set_environment_variables : 
-	@set INCLUDE=$(INCLUDES);$(INCLUDE)
-	@set LIB=$(LIB)
-
-
 ###########################################################################
 ## FINAL TARGET
 ###########################################################################
@@ -279,9 +280,9 @@ set_environment_variables :
 #---------------------------------
 
 $(PRODUCT) : $(OBJS) $(PREBUILT_OBJS)
-	@cmd /C "@echo ### Creating static library "$(PRODUCT)" ..."
-	$(AR) $(ARFLAGS) -out:$(PRODUCT) @$(CMD_FILE)
-	@cmd /C "@echo ### Created: $(PRODUCT)"
+	@echo $(call FORMAT_FOR_ECHO,### Creating static library "$(PRODUCT)" ...)
+	$(AR) $(ARFLAGS)  $(PRODUCT) $(OBJS)
+	@echo $(call FORMAT_FOR_ECHO,### Created: "$(PRODUCT)")
 
 
 ###########################################################################
@@ -292,99 +293,167 @@ $(PRODUCT) : $(OBJS) $(PREBUILT_OBJS)
 # SOURCE-TO-OBJECT
 #---------------------
 
-.c.obj :
-	$(CC) $(CFLAGS) -Fo"$@" "$<"
+%.o : %.c
+	$(CC) $(CFLAGS) -o "$@" "$<"
 
 
-.cpp.obj :
-	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
+%.o : %.cpp
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
 
 
-.cc.obj :
-	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
+%.o : %.cc
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
 
 
-.cxx.obj :
-	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
+%.o : %.cp
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
 
 
-{$(RELATIVE_PATH_TO_ANCHOR)}.c.obj :
-	$(CC) $(CFLAGS) -Fo"$@" "$<"
+%.o : %.cxx
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
 
 
-{$(RELATIVE_PATH_TO_ANCHOR)}.cpp.obj :
-	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
+%.o : %.CPP
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
 
 
-{$(RELATIVE_PATH_TO_ANCHOR)}.cc.obj :
-	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
+%.o : %.c++
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
 
 
-{$(RELATIVE_PATH_TO_ANCHOR)}.cxx.obj :
-	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
+%.o : %.C
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
 
 
-{$(START_DIR)\codegen\lib\QSF_w_offset_intctrl}.c.obj :
-	$(CC) $(CFLAGS) -Fo"$@" "$<"
+%.o : $(RELATIVE_PATH_TO_ANCHOR)/%.c
+	$(CC) $(CFLAGS) -o "$@" "$<"
 
 
-{$(START_DIR)\codegen\lib\QSF_w_offset_intctrl}.cpp.obj :
-	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
+%.o : $(RELATIVE_PATH_TO_ANCHOR)/%.cpp
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
 
 
-{$(START_DIR)\codegen\lib\QSF_w_offset_intctrl}.cc.obj :
-	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
+%.o : $(RELATIVE_PATH_TO_ANCHOR)/%.cc
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
 
 
-{$(START_DIR)\codegen\lib\QSF_w_offset_intctrl}.cxx.obj :
-	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
+%.o : $(RELATIVE_PATH_TO_ANCHOR)/%.cp
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
 
 
-{$(START_DIR)}.c.obj :
-	$(CC) $(CFLAGS) -Fo"$@" "$<"
+%.o : $(RELATIVE_PATH_TO_ANCHOR)/%.cxx
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
 
 
-{$(START_DIR)}.cpp.obj :
-	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
+%.o : $(RELATIVE_PATH_TO_ANCHOR)/%.CPP
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
 
 
-{$(START_DIR)}.cc.obj :
-	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
+%.o : $(RELATIVE_PATH_TO_ANCHOR)/%.c++
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
 
 
-{$(START_DIR)}.cxx.obj :
-	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
+%.o : $(RELATIVE_PATH_TO_ANCHOR)/%.C
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
 
 
-rt_nonfinite.obj : "$(START_DIR)\codegen\lib\QSF_w_offset_intctrl\rt_nonfinite.cpp"
-	$(CPP) $(CPPFLAGS) -Fo"$@" "$(START_DIR)\codegen\lib\QSF_w_offset_intctrl\rt_nonfinite.cpp"
+%.o : $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/%.c
+	$(CC) $(CFLAGS) -o "$@" "$<"
 
 
-rtGetNaN.obj : "$(START_DIR)\codegen\lib\QSF_w_offset_intctrl\rtGetNaN.cpp"
-	$(CPP) $(CPPFLAGS) -Fo"$@" "$(START_DIR)\codegen\lib\QSF_w_offset_intctrl\rtGetNaN.cpp"
+%.o : $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/%.cpp
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
 
 
-rtGetInf.obj : "$(START_DIR)\codegen\lib\QSF_w_offset_intctrl\rtGetInf.cpp"
-	$(CPP) $(CPPFLAGS) -Fo"$@" "$(START_DIR)\codegen\lib\QSF_w_offset_intctrl\rtGetInf.cpp"
+%.o : $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/%.cc
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
 
 
-QSF_w_offset_intctrl_initialize.obj : "$(START_DIR)\codegen\lib\QSF_w_offset_intctrl\QSF_w_offset_intctrl_initialize.cpp"
-	$(CPP) $(CPPFLAGS) -Fo"$@" "$(START_DIR)\codegen\lib\QSF_w_offset_intctrl\QSF_w_offset_intctrl_initialize.cpp"
+%.o : $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/%.cp
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
 
 
-QSF_w_offset_intctrl_terminate.obj : "$(START_DIR)\codegen\lib\QSF_w_offset_intctrl\QSF_w_offset_intctrl_terminate.cpp"
-	$(CPP) $(CPPFLAGS) -Fo"$@" "$(START_DIR)\codegen\lib\QSF_w_offset_intctrl\QSF_w_offset_intctrl_terminate.cpp"
+%.o : $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/%.cxx
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
 
 
-QSF_w_offset_intctrl.obj : "$(START_DIR)\codegen\lib\QSF_w_offset_intctrl\QSF_w_offset_intctrl.cpp"
-	$(CPP) $(CPPFLAGS) -Fo"$@" "$(START_DIR)\codegen\lib\QSF_w_offset_intctrl\QSF_w_offset_intctrl.cpp"
+%.o : $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/%.CPP
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
+
+
+%.o : $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/%.c++
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
+
+
+%.o : $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/%.C
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
+
+
+%.o : $(START_DIR)/%.c
+	$(CC) $(CFLAGS) -o "$@" "$<"
+
+
+%.o : $(START_DIR)/%.cpp
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
+
+
+%.o : $(START_DIR)/%.cc
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
+
+
+%.o : $(START_DIR)/%.cp
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
+
+
+%.o : $(START_DIR)/%.cxx
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
+
+
+%.o : $(START_DIR)/%.CPP
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
+
+
+%.o : $(START_DIR)/%.c++
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
+
+
+%.o : $(START_DIR)/%.C
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
+
+
+rt_nonfinite.o : $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/rt_nonfinite.cpp
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
+
+
+rtGetNaN.o : $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/rtGetNaN.cpp
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
+
+
+rtGetInf.o : $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/rtGetInf.cpp
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
+
+
+QSF_w_offset_intctrl_initialize.o : $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/QSF_w_offset_intctrl_initialize.cpp
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
+
+
+QSF_w_offset_intctrl_terminate.o : $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/QSF_w_offset_intctrl_terminate.cpp
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
+
+
+QSF_w_offset_intctrl.o : $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/QSF_w_offset_intctrl.cpp
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
+
+
+norm.o : $(START_DIR)/codegen/lib/QSF_w_offset_intctrl/norm.cpp
+	$(CPP) $(CPPFLAGS) -o "$@" "$<"
 
 
 ###########################################################################
 ## DEPENDENCIES
 ###########################################################################
 
-$(ALL_OBJS) : rtw_proj.tmw $(COMPILER_COMMAND_FILE) $(MAKEFILE)
+$(ALL_OBJS) : rtw_proj.tmw $(MAKEFILE)
 
 
 ###########################################################################
@@ -392,36 +461,36 @@ $(ALL_OBJS) : rtw_proj.tmw $(COMPILER_COMMAND_FILE) $(MAKEFILE)
 ###########################################################################
 
 info : 
-	@cmd /C "@echo ### PRODUCT = $(PRODUCT)"
-	@cmd /C "@echo ### PRODUCT_TYPE = $(PRODUCT_TYPE)"
-	@cmd /C "@echo ### BUILD_TYPE = $(BUILD_TYPE)"
-	@cmd /C "@echo ### INCLUDES = $(INCLUDES)"
-	@cmd /C "@echo ### DEFINES = $(DEFINES)"
-	@cmd /C "@echo ### ALL_SRCS = $(ALL_SRCS)"
-	@cmd /C "@echo ### ALL_OBJS = $(ALL_OBJS)"
-	@cmd /C "@echo ### LIBS = $(LIBS)"
-	@cmd /C "@echo ### MODELREF_LIBS = $(MODELREF_LIBS)"
-	@cmd /C "@echo ### SYSTEM_LIBS = $(SYSTEM_LIBS)"
-	@cmd /C "@echo ### TOOLCHAIN_LIBS = $(TOOLCHAIN_LIBS)"
-	@cmd /C "@echo ### CFLAGS = $(CFLAGS)"
-	@cmd /C "@echo ### LDFLAGS = $(LDFLAGS)"
-	@cmd /C "@echo ### SHAREDLIB_LDFLAGS = $(SHAREDLIB_LDFLAGS)"
-	@cmd /C "@echo ### CPPFLAGS = $(CPPFLAGS)"
-	@cmd /C "@echo ### CPP_LDFLAGS = $(CPP_LDFLAGS)"
-	@cmd /C "@echo ### CPP_SHAREDLIB_LDFLAGS = $(CPP_SHAREDLIB_LDFLAGS)"
-	@cmd /C "@echo ### ARFLAGS = $(ARFLAGS)"
-	@cmd /C "@echo ### MEX_CFLAGS = $(MEX_CFLAGS)"
-	@cmd /C "@echo ### MEX_CPPFLAGS = $(MEX_CPPFLAGS)"
-	@cmd /C "@echo ### MEX_LDFLAGS = $(MEX_LDFLAGS)"
-	@cmd /C "@echo ### MEX_CPPLDFLAGS = $(MEX_CPPLDFLAGS)"
-	@cmd /C "@echo ### DOWNLOAD_FLAGS = $(DOWNLOAD_FLAGS)"
-	@cmd /C "@echo ### EXECUTE_FLAGS = $(EXECUTE_FLAGS)"
-	@cmd /C "@echo ### MAKE_FLAGS = $(MAKE_FLAGS)"
+	@echo $(call FORMAT_FOR_ECHO,### PRODUCT = $(PRODUCT))
+	@echo $(call FORMAT_FOR_ECHO,### PRODUCT_TYPE = $(PRODUCT_TYPE))
+	@echo $(call FORMAT_FOR_ECHO,### BUILD_TYPE = $(BUILD_TYPE))
+	@echo $(call FORMAT_FOR_ECHO,### INCLUDES = $(INCLUDES))
+	@echo $(call FORMAT_FOR_ECHO,### DEFINES = $(DEFINES))
+	@echo $(call FORMAT_FOR_ECHO,### ALL_SRCS = $(ALL_SRCS))
+	@echo $(call FORMAT_FOR_ECHO,### ALL_OBJS = $(ALL_OBJS))
+	@echo $(call FORMAT_FOR_ECHO,### LIBS = $(LIBS))
+	@echo $(call FORMAT_FOR_ECHO,### MODELREF_LIBS = $(MODELREF_LIBS))
+	@echo $(call FORMAT_FOR_ECHO,### SYSTEM_LIBS = $(SYSTEM_LIBS))
+	@echo $(call FORMAT_FOR_ECHO,### TOOLCHAIN_LIBS = $(TOOLCHAIN_LIBS))
+	@echo $(call FORMAT_FOR_ECHO,### CFLAGS = $(CFLAGS))
+	@echo $(call FORMAT_FOR_ECHO,### LDFLAGS = $(LDFLAGS))
+	@echo $(call FORMAT_FOR_ECHO,### SHAREDLIB_LDFLAGS = $(SHAREDLIB_LDFLAGS))
+	@echo $(call FORMAT_FOR_ECHO,### CPPFLAGS = $(CPPFLAGS))
+	@echo $(call FORMAT_FOR_ECHO,### CPP_LDFLAGS = $(CPP_LDFLAGS))
+	@echo $(call FORMAT_FOR_ECHO,### CPP_SHAREDLIB_LDFLAGS = $(CPP_SHAREDLIB_LDFLAGS))
+	@echo $(call FORMAT_FOR_ECHO,### ARFLAGS = $(ARFLAGS))
+	@echo $(call FORMAT_FOR_ECHO,### MEX_CFLAGS = $(MEX_CFLAGS))
+	@echo $(call FORMAT_FOR_ECHO,### MEX_CPPFLAGS = $(MEX_CPPFLAGS))
+	@echo $(call FORMAT_FOR_ECHO,### MEX_LDFLAGS = $(MEX_LDFLAGS))
+	@echo $(call FORMAT_FOR_ECHO,### MEX_CPPLDFLAGS = $(MEX_CPPLDFLAGS))
+	@echo $(call FORMAT_FOR_ECHO,### DOWNLOAD_FLAGS = $(DOWNLOAD_FLAGS))
+	@echo $(call FORMAT_FOR_ECHO,### EXECUTE_FLAGS = $(EXECUTE_FLAGS))
+	@echo $(call FORMAT_FOR_ECHO,### MAKE_FLAGS = $(MAKE_FLAGS))
 
 
 clean : 
 	$(ECHO) "### Deleting all derived files ..."
-	@if exist $(PRODUCT) $(RM) $(PRODUCT)
+	$(RM) $(PRODUCT)
 	$(RM) $(ALL_OBJS)
 	$(ECHO) "### Deleted all derived files."
 
