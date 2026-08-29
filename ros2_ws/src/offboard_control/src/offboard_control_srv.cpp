@@ -102,8 +102,11 @@ class OffboardControl : public rclcpp::Node {
         // double Iqzz = 0.02934;
 
         // Geometric controller gains
+        // 0 < cI < min(sqrt(kR/Iqxx)/Iqzz, 4*kR*kOmega/(4*kR*Iqzz + kOmega^2))
         kR_ = this->declare_parameter<double>("kR_", 5.0); // 5.0(sim), 2.5(exp)
         kOmega_ = this->declare_parameter<double>("kOmega_", 0.8); //0.8(sim), 0.35(exp)
+        kI_ = this->declare_parameter<double>("kI_", 0.1);
+        cI_ = this->declare_parameter<double>("cI_", 3.0); 
 
         // SLS offset Max torque
         sls_offset_params_.tau_x_max_ = this->declare_parameter<double>("tau_x_max_", 4.15*2.21356);
@@ -316,6 +319,8 @@ class OffboardControl : public rclcpp::Node {
     std::string att_control_type_ = "QSF_offset"; // "Default", "QSF_offset", etc. (For later)
     double kR_;
     double kOmega_;
+    double kI_;
+    double cI_;
 
     // Data Source Toggles
     bool use_sim_{true};
@@ -470,6 +475,10 @@ rcl_interfaces::msg::SetParametersResult OffboardControl::parameters_callback(co
             kR_ = param.as_double();
         else if (param.get_name() == "kOmega_")
             kOmega_ = param.as_double();
+        else if (param.get_name() == "kI_")
+            kI_ = param.as_double();
+        else if (param.get_name() == "cI_")
+            cI_ = param.as_double();
 
         else if (param.get_name() == "use_sim")
             use_sim_ = param.as_bool();
@@ -936,12 +945,42 @@ Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thru
     // geometric PID control
     double q_vec_[3] = {sls_offset_params_.q_vec[0], sls_offset_params_.q_vec[1], sls_offset_params_.q_vec[2]};
     double dq_vec[3] = {sls_offset_params_.dq[0], sls_offset_params_.dq[1], sls_offset_params_.dq[2]};
-    double gains[4] = {kR_, kOmega_, 0.0, 0.0}; // disable integral gains for now
-    double eI[3] = {0.0, 0.0, 0.0}; // disable for now
+    double gains[4] = {kR_, kOmega_, kI_, cI_};
     double physics_parameters[7] = {mass_, sls_offset_params_.load_mass_, gravity_, sls_offset_params_.l, sls_offset_params_.Iqxx, sls_offset_params_.Iqyy, sls_offset_params_.Iqzz};
-    double rate_sp_dt2[3], eI_dt[3];
+    double rate_sp_dt2[3];
+    // integral paramaters
+    static double eI[3] = {0.0, 0.0, 0.0}; // integral state input
+    static double eI_dt[3] = {0.0, 0.0, 0.0}; // derivative of integral state input
+    static bool first_call_inner_loop_ = true;
+    static rclcpp::Time last_called_inner_loop_ = this->get_clock()->now();
+    double dt = 0.0;
+
+    if (first_call_inner_loop_) {
+        first_call_inner_loop_ = false;
+        last_called_inner_loop_ = this->get_clock()->now();
+    } else {
+        rclcpp::Time now = this->get_clock()->now();
+        dt = std::clamp((now - last_called_inner_loop_).seconds(), 0.001, 0.025);
+        last_called_inner_loop_ = now;
+    }
     Inner_loop_geometric_PID(rpy_angles, q_vec_, dq_vec, Omega, sls_offset_params_.R_Bd.data(), Omegad, dOmegad, -mass_ * thrust_command, 
                              gains, physics_parameters, sls_offset_params_.L_offset_, eI, taub, tau, rate_sp_dt, rate_sp_dt2, eI_dt); 
+
+    // reset integral if not in offboard mode
+    if (reset_integral_) {
+        for (int i = 0; i < 3; i++) {
+            eI[i] = 0.0;
+        }
+        first_call_inner_loop_ = true;
+        reset_integral_ = false;
+    } else {
+        for(int i = 0; i < 3; i++) {
+            if (std::isfinite(eI_dt[i])) {
+                // clamp integral state to [-10, 10] to prevent too much windup
+                eI[i] = std::clamp(eI[i] + (eI_dt[i] * dt), -10.0, 10.0);
+            }
+        }
+    }
 
     // Normalize tau for torque and thrust setpoint to [-1, 1]
     tau[0] = std::clamp(tau[0] / sls_offset_params_.tau_x_max_, -1.0, 1.0);
