@@ -1,11 +1,8 @@
 //
-// Academic License - for use in teaching, academic research, and meeting
-// course requirements at degree granting institutions only.  Not for
-// government, commercial, or other organizational use.
 // File: _coder_Flatness_mission_spfig8_mex.cpp
 //
-// MATLAB Coder version            : 24.2
-// C/C++ source code generated on  : 27-Aug-2026 15:40:59
+// MATLAB Coder version            : 26.1
+// C/C++ source code generated on  : 31-Aug-2026 23:16:44
 //
 
 // Include Files
@@ -36,18 +33,18 @@ void mexFunction(int32_T nlhs, mxArray *plhs[], int32_T nrhs,
 emlrtCTX mexFunctionCreateRootTLS()
 {
   emlrtCreateRootTLSR2022a(&emlrtRootTLSGlobal, &emlrtContextGlobal, nullptr, 1,
-                           nullptr, "windows-1252", true);
+                           nullptr, "UTF-8", true);
   return emlrtRootTLSGlobal;
 }
 
 //
 // Arguments    : int32_T nlhs
-//                mxArray *plhs[3]
+//                mxArray *plhs[4]
 //                int32_T nrhs
 //                const mxArray *prhs[13]
 // Return Type  : void
 //
-void unsafe_Flatness_mission_spfig8_mexFunction(int32_T nlhs, mxArray *plhs[3],
+void unsafe_Flatness_mission_spfig8_mexFunction(int32_T nlhs, mxArray *plhs[4],
                                                 int32_T nrhs,
                                                 const mxArray *prhs[13])
 {
@@ -56,31 +53,27 @@ void unsafe_Flatness_mission_spfig8_mexFunction(int32_T nlhs, mxArray *plhs[3],
       nullptr, // tls
       nullptr  // prev
   };
-  const mxArray *b_prhs[13];
-  const mxArray *outputs[3];
-  int32_T i1;
+  const mxArray *outputs[4];
+  int32_T i;
   st.tls = emlrtRootTLSGlobal;
   // Check for proper number of arguments.
   if (nrhs != 13) {
     emlrtErrMsgIdAndTxt(&st, "EMLRT:runTime:WrongNumberOfInputs", 5, 12, 13, 4,
                         23, "Flatness_mission_spfig8");
   }
-  if (nlhs > 3) {
+  if (nlhs > 4) {
     emlrtErrMsgIdAndTxt(&st, "EMLRT:runTime:TooManyOutputArguments", 3, 4, 23,
                         "Flatness_mission_spfig8");
   }
   // Call the function.
-  for (int32_T i{0}; i < 13; i++) {
-    b_prhs[i] = prhs[i];
-  }
-  Flatness_mission_spfig8_api(b_prhs, nlhs, outputs);
+  Flatness_mission_spfig8_api(prhs, nlhs, outputs);
   // Copy over outputs to the caller.
   if (nlhs < 1) {
-    i1 = 1;
+    i = 1;
   } else {
-    i1 = nlhs;
+    i = nlhs;
   }
-  emlrtReturnArrays(i1, &plhs[0], &outputs[0]);
+  emlrtReturnArrays(i, &plhs[0], &outputs[0]);
 }
 
 //

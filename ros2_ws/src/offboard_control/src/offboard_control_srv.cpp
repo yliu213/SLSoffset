@@ -362,6 +362,7 @@ class OffboardControl : public rclcpp::Node {
         double Omegad1 = 0.0, Omegad2 = 0.0, Omegad3 = 0.0;
         double dOmegad1 = 0.0, dOmegad2 = 0.0, dOmegad3 = 0.0;
         double aLd1 = 0.0, aLd2 = 0.0, aLd3 = 0.0;
+        double snapd1 = 0.0, snapd2 = 0.0, snapd3 = 0.0;
         double integral[3] = {0.0, 0.0, 0.0};
         double Iqxx = 0.020653500000000005; // 
         double Iqyy = 0.020653500000000005; // 
@@ -536,7 +537,6 @@ void OffboardControl::publish_trajectory_setpoint() {
     Eigen::Vector3d v_ref(latest_ref_.velocity[0], latest_ref_.velocity[1], latest_ref_.velocity[2]);
     Eigen::Vector3d a_ref(latest_ref_.acceleration[0], latest_ref_.acceleration[1], latest_ref_.acceleration[2]);
     Eigen::Vector3d j_ref(latest_ref_.jerk[0], latest_ref_.jerk[1], latest_ref_.jerk[2]);
-    // Eigen::Vector3d snap_ref(latest_ref_.snap[0], latest_ref_.snap[1], latest_ref_.snap[2]);
 
     // Can add to the a_cmd types here, later (for different controller support)
     a_cmd = compute_acceleration_command(p, v, p_ref, v_ref, a_ref);
@@ -545,14 +545,7 @@ void OffboardControl::publish_trajectory_setpoint() {
         if (att_control_type_ == "QSF_offset" && sls_offset_params_.load_received_) {
             // auto [pos_des, vel_des, acc_des, jerk_des, snap_des] = sls_offset_differential_flatness();
             if (flight_path_ == "setpoints_figure8") sls_offset_differential_flatness();
-
-            // Override the external ROS subscriber with the generated trajectory
-            // uncomment for traj. from differential flatness
-            // p_ref = pos_des;
-            // v_ref = vel_des;
-            // a_ref = acc_des;
-            // j_ref = jerk_des;
-            // latest_ref_snap_ = snap_des;
+            latest_ref_snap_ << sls_offset_params_.snapd1, sls_offset_params_.snapd2, sls_offset_params_.snapd3;
 
             // Apply QSF slung load offset controller for attitude and rate mode control
             std::tie(q_cmd, rate_thrust_cmd, torque_cmd) = apply_QSF_offset_ctrl(p_ref, v_ref, a_ref, j_ref, latest_ref_snap_);
@@ -1011,13 +1004,13 @@ void OffboardControl::sls_offset_differential_flatness() {
     //                           d3xipd, d4xipd, ddRL, &sls_offset_params_.Td_scaler);
 
     // flatness based on low angular acc.
-    double aLd[3];
+    double aLd[3], snapd[3];
     Eigen::Vector3d rate_ned(sls_offset_params_.latest_rate_enu_.y(), sls_offset_params_.latest_rate_enu_.x(), -sls_offset_params_.latest_rate_enu_.z());
     double Omega[3] = {rate_ned.x(), rate_ned.y(), rate_ned.z()};
     Flatness_mission_spfig8(t, sls_offset_params_.load_mass_, mass_, gravity_, sls_offset_params_.l, sls_offset_params_.L_offset_, 
                             sls_offset_params_.phi_rad_, sls_offset_params_.theta_rad_, sls_offset_params_.psi_rad_, Omega, 
                             /*A=*/1.5, /*B=*/1.0, /*omega=*/0.4,
-                            Od, dOd, aLd);
+                            Od, dOd, aLd, snapd);
 
     // Store outputs
     sls_offset_params_.Omegad1 = Od[0];
@@ -1032,6 +1025,9 @@ void OffboardControl::sls_offset_differential_flatness() {
     sls_offset_params_.aLd1 = aLd[0];
     sls_offset_params_.aLd2 = aLd[1];
     sls_offset_params_.aLd3 = aLd[2];
+    sls_offset_params_.snapd1 = snapd[0];
+    sls_offset_params_.snapd2 = snapd[1];
+    sls_offset_params_.snapd3 = snapd[2];
 
     // Eigen::Vector3d pos_des(xipd[0], xipd[1], xipd[2]);
     // Eigen::Vector3d vel_des(dxipd[0], dxipd[1], dxipd[2]);

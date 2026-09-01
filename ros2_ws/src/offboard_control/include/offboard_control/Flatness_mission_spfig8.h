@@ -1,11 +1,8 @@
 //
-// Academic License - for use in teaching, academic research, and meeting
-// course requirements at degree granting institutions only.  Not for
-// government, commercial, or other organizational use.
 // File: Flatness_mission_spfig8.h
 //
-// MATLAB Coder version            : 24.2
-// C/C++ source code generated on  : 27-Aug-2026 15:40:59
+// MATLAB Coder version            : 26.1
+// C/C++ source code generated on  : 31-Aug-2026 23:16:44
 //
 
 #ifndef FLATNESS_MISSION_SPFIG8_H
@@ -22,7 +19,7 @@ extern void Flatness_mission_spfig8(double t, double mp, double mq, double g,
                                     double phi, double theta, double psi,
                                     const double Omega[3], double A, double B,
                                     double w, double Od[3], double dOd[3],
-                                    double aLd[3]);
+                                    double aLd[3], double snapd[3]);
 
 #endif
 //

@@ -1,11 +1,8 @@
 //
-// Academic License - for use in teaching, academic research, and meeting
-// course requirements at degree granting institutions only.  Not for
-// government, commercial, or other organizational use.
 // File: _coder_Flatness_mission_spfig8_api.h
 //
-// MATLAB Coder version            : 24.2
-// C/C++ source code generated on  : 27-Aug-2026 15:40:59
+// MATLAB Coder version            : 26.1
+// C/C++ source code generated on  : 31-Aug-2026 23:16:44
 //
 
 #ifndef _CODER_FLATNESS_MISSION_SPFIG8_API_H
@@ -24,13 +21,13 @@ extern emlrtContext emlrtContextGlobal;
 
 // Function Declarations
 void Flatness_mission_spfig8(real_T t, real_T mp, real_T mq, real_T g, real_T l,
-                             real_T L_offset[3], real_T phi, real_T theta,
-                             real_T psi, real_T Omega[3], real_T A, real_T B,
-                             real_T w, real_T Od[3], real_T dOd[3],
-                             real_T aLd[3]);
+                             const real_T L_offset[3], real_T phi, real_T theta,
+                             real_T psi, const real_T Omega[3], real_T A,
+                             real_T B, real_T w, real_T Od[3], real_T dOd[3],
+                             real_T aLd[3], real_T snapd[3]);
 
 void Flatness_mission_spfig8_api(const mxArray *const prhs[13], int32_T nlhs,
-                                 const mxArray *plhs[3]);
+                                 const mxArray *plhs[4]);
 
 void Flatness_mission_spfig8_atexit();
 

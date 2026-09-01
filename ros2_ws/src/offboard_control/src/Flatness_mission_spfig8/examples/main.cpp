@@ -1,11 +1,8 @@
 //
-// Academic License - for use in teaching, academic research, and meeting
-// course requirements at degree granting institutions only.  Not for
-// government, commercial, or other organizational use.
 // File: main.cpp
 //
-// MATLAB Coder version            : 24.2
-// C/C++ source code generated on  : 27-Aug-2026 15:40:59
+// MATLAB Coder version            : 26.1
+// C/C++ source code generated on  : 31-Aug-2026 23:16:44
 //
 
 /*************************************************************************/
@@ -36,6 +33,7 @@
 // Include Files
 #include "main.h"
 #include "Flatness_mission_spfig8.h"
+#include "Flatness_mission_spfig8_initialize.h"
 #include "Flatness_mission_spfig8_terminate.h"
 #include "rt_nonfinite.h"
 
@@ -75,9 +73,10 @@ static double argInit_real_T()
 //
 int main(int, char **)
 {
-  // The initialize function is being called automatically from your entry-point
-  // function. So, a call to initialize is not included here. Invoke the
-  // entry-point functions.
+  // Initialize the application.
+  // You do not need to do this more than one time.
+  Flatness_mission_spfig8_initialize();
+  // Invoke the entry-point functions.
   // You can call entry-point functions multiple times.
   main_Flatness_mission_spfig8();
   // Terminate the application.
@@ -96,6 +95,7 @@ void main_Flatness_mission_spfig8()
   double Od[3];
   double aLd[3];
   double dOd[3];
+  double snapd[3];
   double t_tmp;
   // Initialize function 'Flatness_mission_spfig8' input arguments.
   t_tmp = argInit_real_T();
@@ -105,7 +105,7 @@ void main_Flatness_mission_spfig8()
   // Call the entry-point 'Flatness_mission_spfig8'.
   Flatness_mission_spfig8(t_tmp, t_tmp, t_tmp, t_tmp, t_tmp, L_offset_tmp,
                           t_tmp, t_tmp, t_tmp, L_offset_tmp, t_tmp, t_tmp,
-                          t_tmp, Od, dOd, aLd);
+                          t_tmp, Od, dOd, aLd, snapd);
 }
 
 //

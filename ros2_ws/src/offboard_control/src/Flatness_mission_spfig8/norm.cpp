@@ -1,11 +1,8 @@
 //
-// Academic License - for use in teaching, academic research, and meeting
-// course requirements at degree granting institutions only.  Not for
-// government, commercial, or other organizational use.
 // File: norm.cpp
 //
-// MATLAB Coder version            : 24.2
-// C/C++ source code generated on  : 27-Aug-2026 15:40:59
+// MATLAB Coder version            : 26.1
+// C/C++ source code generated on  : 31-Aug-2026 23:16:44
 //
 
 // Include Files
@@ -25,13 +22,14 @@ double b_norm(const double x[3])
   double scale;
   double t;
   double y;
-  scale = 3.3121686421112381E-170;
+  boolean_T b;
+  scale = 3.312168642111238E-170;
   absxk = std::abs(x[0]);
-  if (absxk > 3.3121686421112381E-170) {
+  if (absxk > 3.312168642111238E-170) {
     y = 1.0;
     scale = absxk;
   } else {
-    t = absxk / 3.3121686421112381E-170;
+    t = absxk / 3.312168642111238E-170;
     y = t * t;
   }
   absxk = std::abs(x[1]);
@@ -52,7 +50,27 @@ double b_norm(const double x[3])
     t = absxk / scale;
     y += t * t;
   }
-  return scale * std::sqrt(y);
+  y = scale * std::sqrt(y);
+  b = std::isnan(y);
+  if (b) {
+    int k;
+    k = 0;
+    int exitg1;
+    do {
+      exitg1 = 0;
+      if (k < 3) {
+        if (std::isnan(x[k])) {
+          exitg1 = 1;
+        } else {
+          k++;
+        }
+      } else {
+        y = rtInf;
+        exitg1 = 1;
+      }
+    } while (exitg1 == 0);
+  }
+  return y;
 }
 
 } // namespace coder

@@ -1,11 +1,8 @@
 //
-// Academic License - for use in teaching, academic research, and meeting
-// course requirements at degree granting institutions only.  Not for
-// government, commercial, or other organizational use.
 // File: _coder_Flatness_mission_spfig8_api.cpp
 //
-// MATLAB Coder version            : 24.2
-// C/C++ source code generated on  : 27-Aug-2026 15:40:59
+// MATLAB Coder version            : 26.1
+// C/C++ source code generated on  : 31-Aug-2026 23:16:44
 //
 
 // Include Files
@@ -18,7 +15,7 @@ emlrtCTX emlrtRootTLSGlobal{nullptr};
 emlrtContext emlrtContextGlobal{
     true,                                                 // bFirstTime
     false,                                                // bInitialized
-    131659U,                                              // fVersionInfo
+    131690U,                                              // fVersionInfo
     nullptr,                                              // fErrorFunction
     "Flatness_mission_spfig8",                            // fFunctionName
     nullptr,                                              // fRTCallStack
@@ -178,8 +175,13 @@ static const mxArray *emlrt_marshallOut(real_T u[3])
   static const int32_T i1{3};
   const mxArray *m;
   const mxArray *y;
+  void *existingData;
   y = nullptr;
   m = emlrtCreateNumericArray(1, (const void *)&i, mxDOUBLE_CLASS, mxREAL);
+  existingData = emlrtMxGetData((mxArray *)m);
+  if (existingData != (void *)&u[0]) {
+    emlrtFreeMex(existingData);
+  }
   emlrtMxSetData((mxArray *)m, &u[0]);
   emlrtSetDimensions((mxArray *)m, &i1, 1);
   emlrtAssign(&y, m);
@@ -189,11 +191,11 @@ static const mxArray *emlrt_marshallOut(real_T u[3])
 //
 // Arguments    : const mxArray * const prhs[13]
 //                int32_T nlhs
-//                const mxArray *plhs[3]
+//                const mxArray *plhs[4]
 // Return Type  : void
 //
 void Flatness_mission_spfig8_api(const mxArray *const prhs[13], int32_T nlhs,
-                                 const mxArray *plhs[3])
+                                 const mxArray *plhs[4])
 {
   emlrtStack st{
       nullptr, // site
@@ -205,6 +207,7 @@ void Flatness_mission_spfig8_api(const mxArray *const prhs[13], int32_T nlhs,
   real_T(*Omega)[3];
   real_T(*aLd)[3];
   real_T(*dOd)[3];
+  real_T(*snapd)[3];
   real_T A;
   real_T B;
   real_T g;
@@ -220,6 +223,7 @@ void Flatness_mission_spfig8_api(const mxArray *const prhs[13], int32_T nlhs,
   Od = (real_T(*)[3])mxMalloc(sizeof(real_T[3]));
   dOd = (real_T(*)[3])mxMalloc(sizeof(real_T[3]));
   aLd = (real_T(*)[3])mxMalloc(sizeof(real_T[3]));
+  snapd = (real_T(*)[3])mxMalloc(sizeof(real_T[3]));
   // Marshall function inputs
   t = emlrt_marshallIn(st, emlrtAliasP(prhs[0]), "t");
   mp = emlrt_marshallIn(st, emlrtAliasP(prhs[1]), "mp");
@@ -236,7 +240,7 @@ void Flatness_mission_spfig8_api(const mxArray *const prhs[13], int32_T nlhs,
   w = emlrt_marshallIn(st, emlrtAliasP(prhs[12]), "w");
   // Invoke the target function
   Flatness_mission_spfig8(t, mp, mq, g, l, *L_offset, phi, theta, psi, *Omega,
-                          A, B, w, *Od, *dOd, *aLd);
+                          A, B, w, *Od, *dOd, *aLd, *snapd);
   // Marshall function outputs
   plhs[0] = emlrt_marshallOut(*Od);
   if (nlhs > 1) {
@@ -244,6 +248,9 @@ void Flatness_mission_spfig8_api(const mxArray *const prhs[13], int32_T nlhs,
   }
   if (nlhs > 2) {
     plhs[2] = emlrt_marshallOut(*aLd);
+  }
+  if (nlhs > 3) {
+    plhs[3] = emlrt_marshallOut(*snapd);
   }
 }
 
