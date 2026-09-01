@@ -238,7 +238,8 @@ class OffboardControl : public rclcpp::Node {
                 } else {
                     // Vicon provides velocities in world frame (ENU)
                     sls_offset_params_.latest_vel_enu_ = lin_vel;
-                    // ENU -> FRD angular rates
+                    // sls_offset_params_.latest_rate_frd_ = Eigen::Vector3d(ang_vel.y(), ang_vel.x(), -ang_vel.z()); // original needs ENU -> NED
+                    // ENU -> FRD angular rates (newly fixed)
                     Eigen::Quaterniond q_world(msg->pose.pose.orientation.w, msg->pose.pose.orientation.x,
                                                msg->pose.pose.orientation.y, msg->pose.pose.orientation.z);
                     Eigen::Matrix3d R_body_to_world = q_world.toRotationMatrix();
@@ -779,7 +780,7 @@ OffboardControl::sls_offset_ned_params OffboardControl::sls_offset_enu_to_ned(Of
             sls_offset_params.R_bi[3], sls_offset_params.R_bi[4], sls_offset_params.R_bi[5], 
             sls_offset_params.R_bi[6], sls_offset_params.R_bi[7], sls_offset_params.R_bi[8];
     Eigen::Vector3d Pivot_Vel = vel_ned + Rbi_ * Omega.cross(L);
-    load_rate_ned = Eigen::Vector3d(q[0], q[1], q[2]).cross(load_vel_ned - Pivot_Vel)/sls_offset_params.l; // corrected
+    load_rate_ned = Eigen::Vector3d(q[0], q[1], q[2]).cross(load_vel_ned - Pivot_Vel)/sls_offset_params.l; 
 
     // Manual calculation of angular rate by finite difference
     // static double conversion_last_called_ = 0.0;
