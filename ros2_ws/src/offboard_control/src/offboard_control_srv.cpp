@@ -534,6 +534,7 @@ void OffboardControl::publish_trajectory_setpoint() {
     Eigen::Vector3d v_ref(latest_ref_.velocity[0], latest_ref_.velocity[1], latest_ref_.velocity[2]);
     Eigen::Vector3d a_ref(latest_ref_.acceleration[0], latest_ref_.acceleration[1], latest_ref_.acceleration[2]);
     Eigen::Vector3d j_ref(latest_ref_.jerk[0], latest_ref_.jerk[1], latest_ref_.jerk[2]);
+    // Eigen::Vector3d snap_ref(latest_ref_.snap[0], latest_ref_.snap[1], latest_ref_.snap[2]);
 
     // Can add to the a_cmd types here, later (for different controller support)
     a_cmd = compute_acceleration_command(p, v, p_ref, v_ref, a_ref);
@@ -793,12 +794,6 @@ OffboardControl::sls_offset_ned_params OffboardControl::sls_offset_enu_to_ned(Of
     Rbi_ << sls_offset_params.R_bi[0], sls_offset_params.R_bi[1], sls_offset_params.R_bi[2], sls_offset_params.R_bi[3], sls_offset_params.R_bi[4], sls_offset_params.R_bi[5], sls_offset_params.R_bi[6],
         sls_offset_params.R_bi[7], sls_offset_params.R_bi[8];
     Eigen::Vector3d Pivot_Vel = vel_ned + Rbi_ * Omega_hat_ * L;
-    // load_rate_ned = Eigen::Vector3d(q[0], q[1], q[2]).cross(load_vel_ned - Pivot_Vel);
-
-    // gpt fixed:
-    // Eigen::Vector3d L_body = {sls_offset_params.L_offset_[0], sls_offset_params.L_offset_[1], sls_offset_params.L_offset_[2]};
-    // Eigen::Vector3d L_ned = Rbi_*L_body;
-    // Eigen::Vector3d Pivot_Vel = vel_ned + rate_ned.cross(L_ned);
     load_rate_ned = Eigen::Vector3d(q[0], q[1], q[2]).cross(load_vel_ned - Pivot_Vel)/sls_offset_params.l; // corrected
 
     // Manual calculation of angular rate by finite difference
@@ -980,15 +975,15 @@ Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thru
 
 // std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d> OffboardControl::sls_offset_differential_flatness() {
 void OffboardControl::sls_offset_differential_flatness() {
-    static auto mission_enabled_time_ = this->get_clock()->now();
-    static bool start_mission_time = false;
-    if (!start_mission_time) {
-        mission_enabled_time_ = this->get_clock()->now();
-        start_mission_time = true;
-    }
+    // static auto mission_enabled_time_ = this->get_clock()->now();
+    // static bool start_mission_time = false;
+    // if (!start_mission_time) {
+    //     mission_enabled_time_ = this->get_clock()->now();
+    //     start_mission_time = true;
+    // }
 
     // fig8
-    double t = this->get_clock()->now().seconds() - mission_enabled_time_.seconds();
+    double t = this->get_clock()->now().seconds() - start_time_.seconds();
     // double T = 42.0; // T = 42.0 -> 0.1496 & 0.2292 hz
     // double A = 1.5;
     // double B = 1.0;
