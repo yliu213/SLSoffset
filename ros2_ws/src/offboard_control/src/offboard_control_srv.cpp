@@ -104,8 +104,8 @@ class OffboardControl : public rclcpp::Node {
         // 0 < cI < min(sqrt(kR/Iqxx)/Iqzz, 4*kR*kOmega/(4*kR*Iqzz + kOmega^2))
         kR_ = this->declare_parameter<double>("kR_", 5.0); // 5.0(sim), 2.5(exp)
         kOmega_ = this->declare_parameter<double>("kOmega_", 0.8); //0.8(sim), 0.35(exp)
-        kI_ = this->declare_parameter<double>("kI_", 0.0); // enable it seems worse
-        cI_ = this->declare_parameter<double>("cI_", 0.0); // enable it seems worse
+        kI_ = this->declare_parameter<double>("kI_", 0.0); // enable it seems worse in sim
+        cI_ = this->declare_parameter<double>("cI_", 0.0); // enable it seems worse in sim
 
         // SLS offset Max torque
         sls_offset_params_.tau_x_max_ = this->declare_parameter<double>("tau_x_max_", 4.15*2.21356);
@@ -217,9 +217,9 @@ class OffboardControl : public rclcpp::Node {
 
                 // V_world = R * V_body
                 sls_offset_params_.latest_rate_enu_ = R_body_to_world * ang_vel_body_flu;
-                // sls_offset_params_.latest_rate_enu_ = ang_vel_body_flu; // store in body frame
             });
 
+        // gz and vicon odometry subscribers
         uav_odom_sub_ =
             this->create_subscription<nav_msgs::msg::Odometry>(uav_topic, rclcpp::SensorDataQoS(), [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
                 // //current_sim_time_ = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
@@ -243,16 +243,11 @@ class OffboardControl : public rclcpp::Node {
                     Eigen::Matrix3d R_body_to_world = q_world.toRotationMatrix();
                     
                     sls_offset_params_.latest_vel_enu_ = R_body_to_world * lin_vel;
-                    sls_offset_params_.latest_rate_enu_ = R_body_to_world * ang_vel;
-                    // sls_offset_params_.latest_rate_enu_ = ang_vel; // store in body frame
+                    sls_offset_params_.latest_rate_frd_ = Eigen::Vector3d(ang_vel.x(), -ang_vel.y(), -ang_vel.z()); // FLU -> FRD
                 } else {
                     // Vicon provides velocities in world frame, no conversion needed
                     sls_offset_params_.latest_vel_enu_ = lin_vel;
                     sls_offset_params_.latest_rate_enu_ = ang_vel;
-                    // Eigen::Quaterniond q_world(msg->pose.pose.orientation.w, msg->pose.pose.orientation.x, 
-                    //                            msg->pose.pose.orientation.y, msg->pose.pose.orientation.z);
-                    // Eigen::Matrix3d R_body_to_world = q_world.toRotationMatrix();
-                    // sls_offset_params_.latest_rate_enu_ = R_body_to_world.transpose() * ang_vel;  // convert world to body frame
                 }
                 attitude_received_ = true;
             });
@@ -724,7 +719,6 @@ OffboardControl::sls_offset_ned_params OffboardControl::sls_offset_enu_to_ned(Of
     Eigen::Vector3d vel_ned(sls_offset_params.latest_vel_enu_.y(), sls_offset_params.latest_vel_enu_.x(), -sls_offset_params.latest_vel_enu_.z());
     Eigen::Vector3d load_vel_ned(sls_offset_params.load_vel_enu_.y(), sls_offset_params.load_vel_enu_.x(), -sls_offset_params.load_vel_enu_.z());
     Eigen::Vector3d pend_rate_ned(sls_offset_params.pend_rate_enu_.y(), sls_offset_params.pend_rate_enu_.x(), -sls_offset_params.pend_rate_enu_.z());
-    Eigen::Vector3d rate_ned(sls_offset_params.latest_rate_enu_.y(), sls_offset_params.latest_rate_enu_.x(), -sls_offset_params.latest_rate_enu_.z());
     Eigen::Vector3d load_rate_ned(sls_offset_params.load_rate_enu_.y(), sls_offset_params.load_rate_enu_.x(), -sls_offset_params.load_rate_enu_.z());
 
     // UAV att. rotation matrix conversion (verified)
@@ -780,15 +774,15 @@ OffboardControl::sls_offset_ned_params OffboardControl::sls_offset_enu_to_ned(Of
     sls_offset_params.q_vec[1] = q[1];
     sls_offset_params.q_vec[2] = q[2];
 
-    // find pendrate = q.cross(loadVel - Pivot_Vel);
+    // find pendrate = q.cross(loadVel - Pivot_Vel)/l;
     // Pivot_Vel = vel_ned + dR*L = vel_ned+ sls_offset_params.R_bi*hat(Omega)*L
-    Eigen::Matrix3d Omega_hat_;
-    Omega_hat_ << 0.0, -rate_ned.z(), rate_ned.y(), rate_ned.z(), 0.0, -rate_ned.x(), -rate_ned.y(), rate_ned.x(), 0.0;
+    Eigen::Vector3d Omega = sls_offset_params_.latest_rate_frd_;
     Eigen::Vector3d L = {sls_offset_params.L_offset_[0], sls_offset_params.L_offset_[1], sls_offset_params.L_offset_[2]};
     Eigen::Matrix3d Rbi_;
-    Rbi_ << sls_offset_params.R_bi[0], sls_offset_params.R_bi[1], sls_offset_params.R_bi[2], sls_offset_params.R_bi[3], sls_offset_params.R_bi[4], sls_offset_params.R_bi[5], sls_offset_params.R_bi[6],
-        sls_offset_params.R_bi[7], sls_offset_params.R_bi[8];
-    Eigen::Vector3d Pivot_Vel = vel_ned + Rbi_ * Omega_hat_ * L;
+    Rbi_ << sls_offset_params.R_bi[0], sls_offset_params.R_bi[1], sls_offset_params.R_bi[2], 
+            sls_offset_params.R_bi[3], sls_offset_params.R_bi[4], sls_offset_params.R_bi[5], 
+            sls_offset_params.R_bi[6], sls_offset_params.R_bi[7], sls_offset_params.R_bi[8];
+    Eigen::Vector3d Pivot_Vel = vel_ned + Rbi_ * Omega.cross(L);
     load_rate_ned = Eigen::Vector3d(q[0], q[1], q[2]).cross(load_vel_ned - Pivot_Vel)/sls_offset_params.l; // corrected
 
     // Manual calculation of angular rate by finite difference
@@ -921,8 +915,8 @@ std::tuple<Eigen::Vector4d, std::pair<Eigen::Vector3d, double>, Eigen::Vector3d>
 
 Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thrust_command) {
     // Angular velocites
-    Eigen::Vector3d rate_ned(sls_offset_params_.latest_rate_enu_.y(), sls_offset_params_.latest_rate_enu_.x(), -sls_offset_params_.latest_rate_enu_.z());
-    double Omega[3] = {rate_ned.x(), rate_ned.y(), rate_ned.z()};
+    Eigen::Vector3d rate_frd(sls_offset_params_.latest_rate_frd_.x(), sls_offset_params_.latest_rate_frd_.y(), sls_offset_params_.latest_rate_frd_.z());
+    double Omega[3] = {rate_frd.x(), rate_frd.y(), rate_frd.z()};
     double Omegad[3] = {sls_offset_params_.Omegad1, sls_offset_params_.Omegad2, sls_offset_params_.Omegad3};
     double dOmegad[3] = {sls_offset_params_.dOmegad1, sls_offset_params_.dOmegad2, sls_offset_params_.dOmegad3};
     double rpy_angles[3] = {sls_offset_params_.phi_rad_, sls_offset_params_.theta_rad_, sls_offset_params_.psi_rad_};
@@ -980,15 +974,8 @@ Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thru
 
 // std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d> OffboardControl::sls_offset_differential_flatness() {
 void OffboardControl::sls_offset_differential_flatness() {
-    // static auto mission_enabled_time_ = this->get_clock()->now();
-    // static bool start_mission_time = false;
-    // if (!start_mission_time) {
-    //     mission_enabled_time_ = this->get_clock()->now();
-    //     start_mission_time = true;
-    // }
-
     // fig8
-    double t = this->get_clock()->now().seconds() - start_time_.seconds();
+    double t = this->get_clock()->now().seconds() - start_time_.seconds(); // clock from publisher
     // double T = 42.0; // T = 42.0 -> 0.1496 & 0.2292 hz
     // double A = 1.5;
     // double B = 1.0;
@@ -1005,8 +992,8 @@ void OffboardControl::sls_offset_differential_flatness() {
 
     // flatness based on low angular acc.
     double aLd[3], snapd[3];
-    Eigen::Vector3d rate_ned(sls_offset_params_.latest_rate_enu_.y(), sls_offset_params_.latest_rate_enu_.x(), -sls_offset_params_.latest_rate_enu_.z());
-    double Omega[3] = {rate_ned.x(), rate_ned.y(), rate_ned.z()};
+    Eigen::Vector3d rate_frd(sls_offset_params_.latest_rate_enu_.y(), sls_offset_params_.latest_rate_enu_.x(), -sls_offset_params_.latest_rate_enu_.z());
+    double Omega[3] = {rate_frd.x(), rate_frd.y(), rate_frd.z()};
     Flatness_mission_spfig8(t, sls_offset_params_.load_mass_, mass_, gravity_, sls_offset_params_.l, sls_offset_params_.L_offset_, 
                             sls_offset_params_.phi_rad_, sls_offset_params_.theta_rad_, sls_offset_params_.psi_rad_, Omega, 
                             /*A=*/1.5, /*B=*/1.0, /*omega=*/0.4,
@@ -1019,15 +1006,12 @@ void OffboardControl::sls_offset_differential_flatness() {
     sls_offset_params_.dOmegad1 = dOd[0];
     sls_offset_params_.dOmegad2 = dOd[1];
     sls_offset_params_.dOmegad3 = dOd[2];
-    // sls_offset_params_.ddR1 = ddRL[0];
-    // sls_offset_params_.ddR2 = ddRL[1];
-    // sls_offset_params_.ddR3 = ddRL[2];
     sls_offset_params_.aLd1 = aLd[0];
     sls_offset_params_.aLd2 = aLd[1];
     sls_offset_params_.aLd3 = aLd[2];
     sls_offset_params_.snapd1 = snapd[0];
     sls_offset_params_.snapd2 = snapd[1];
-    sls_offset_params_.snapd3 = snapd[2];
+    sls_offset_params_.snapd3 = snapd[2]; // output snap since not included in publisher's msg
 
     // Eigen::Vector3d pos_des(xipd[0], xipd[1], xipd[2]);
     // Eigen::Vector3d vel_des(dxipd[0], dxipd[1], dxipd[2]);
