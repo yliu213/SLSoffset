@@ -856,6 +856,14 @@ std::tuple<Eigen::Vector4d, std::pair<Eigen::Vector3d, double>, Eigen::Vector3d>
 
     auto sls_ned_params = sls_offset_enu_to_ned(sls_offset_params_);
 
+    // reset integrals b4 used
+    if (reset_qsf_integral_) {
+        for (int i = 0; i < 3; i++) {
+            sls_offset_params_.integral[i] = 0.0;
+        }
+        reset_qsf_integral_ = false;
+    }
+
     // States = {pl, q, vl, w}
     double states[12] = {sls_ned_params.load_pos.x(), sls_ned_params.load_pos.y(),  sls_ned_params.load_pos.z(),  
                          sls_ned_params.q[0], sls_ned_params.q[1], sls_ned_params.q[2],          
@@ -890,13 +898,7 @@ std::tuple<Eigen::Vector4d, std::pair<Eigen::Vector3d, double>, Eigen::Vector3d>
             sls_offset_params_.integral[i] += integral_dt[i] * dt_QSF;
 
         }
-
-        // reset integral if not in offboard mode
-        if (reset_qsf_integral_) {
-            sls_offset_params_.integral[i] = 0.0;
-        }
     }
-    reset_qsf_integral_ = false;
 
     // Save data
     // Filled column-wise, see codegen for reason
@@ -931,20 +933,29 @@ Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thru
     double Omegad[3] = {sls_offset_params_.Omegad1, sls_offset_params_.Omegad2, sls_offset_params_.Omegad3};
     double dOmegad[3] = {sls_offset_params_.dOmegad1, sls_offset_params_.dOmegad2, sls_offset_params_.dOmegad3};
     double rpy_angles[3] = {sls_offset_params_.phi_rad_, sls_offset_params_.theta_rad_, sls_offset_params_.psi_rad_};
-    double taub[3], tau[3], rate_sp_dt[3];
+    double taub[3], tau[3], rate_sp_dt[3], rate_sp_dt2[3];
 
     // geometric PID control
     double q_vec_[3] = {sls_offset_params_.q_vec[0], sls_offset_params_.q_vec[1], sls_offset_params_.q_vec[2]};
     double dq_vec[3] = {sls_offset_params_.dq[0], sls_offset_params_.dq[1], sls_offset_params_.dq[2]};
     double gains[4] = {kR_, kOmega_, kI_, cI_};
     double physics_parameters[7] = {mass_, sls_offset_params_.load_mass_, gravity_, sls_offset_params_.l, sls_offset_params_.Iqxx, sls_offset_params_.Iqyy, sls_offset_params_.Iqzz};
-    double rate_sp_dt2[3];
+    
     // integral paramaters
     static double eI[3] = {0.0, 0.0, 0.0}; // integral state input
     static double eI_dt[3] = {0.0, 0.0, 0.0}; // derivative of integral state input
     static bool first_call_inner_loop_ = true;
     static rclcpp::Time last_called_inner_loop_ = this->get_clock()->now();
     double dt = 0.0;
+
+    // reset integral if not in offboard mode
+    if (reset_inner_integral_) {
+        for (int i = 0; i < 3; i++) {
+            eI[i] = 0.0;
+        }
+        first_call_inner_loop_ = true;
+        reset_inner_integral_ = false;
+    } 
 
     if (first_call_inner_loop_) {
         first_call_inner_loop_ = false;
@@ -954,22 +965,14 @@ Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thru
         dt = std::clamp((now - last_called_inner_loop_).seconds(), 0.001, 0.025);
         last_called_inner_loop_ = now;
     }
+
     Inner_loop_geometric_PID(rpy_angles, q_vec_, dq_vec, Omega, sls_offset_params_.R_Bd.data(), Omegad, dOmegad, -mass_ * thrust_command, 
                              gains, physics_parameters, sls_offset_params_.L_offset_, eI, taub, tau, rate_sp_dt, rate_sp_dt2, eI_dt); 
 
-    // reset integral if not in offboard mode
-    if (reset_inner_integral_) {
-        for (int i = 0; i < 3; i++) {
-            eI[i] = 0.0;
-        }
-        first_call_inner_loop_ = true;
-        reset_inner_integral_ = false;
-    } else {
-        for(int i = 0; i < 3; i++) {
-            if (std::isfinite(eI_dt[i])) {
-                // clamp integral state to [-10, 10] to prevent too much windup
-                eI[i] = std::clamp(eI[i] + (eI_dt[i] * dt), -10.0, 10.0);
-            }
+    for(int i = 0; i < 3; i++) {
+        if (std::isfinite(eI_dt[i])) {
+            // clamp integral state to [-10, 10] to prevent too much windup
+            eI[i] = std::clamp(eI[i] + (eI_dt[i] * dt), -10.0, 10.0);
         }
     }
 
