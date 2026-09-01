@@ -17,7 +17,6 @@ find_package(tf2 REQUIRED)
 # Changed from add_executable to add_library
 add_library(sls_qsf 
     # QSF offset controllers
-    src/Inner_loop/Inner_loop.cpp # original PD control
     src/Inner_loop_geometric_PID/Inner_loop_geometric_PID.cpp 
     src/Inner_loop_geometric_PID/diag.cpp
     src/Inner_loop_geometric_PID/norm.cpp

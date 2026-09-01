@@ -116,7 +116,7 @@ class TrajectoryPublisher : public rclcpp::Node {
     TrajectoryReference compute_figure8_reference(double t_sec) const {
         const double A = 1.5;
         const double B = 1.0;
-        const double omega = 0.4;
+        const double omega = 0.4; //0.4
         const double z_ref = -0.5;
 
         const double s = std::sin(omega * t_sec);

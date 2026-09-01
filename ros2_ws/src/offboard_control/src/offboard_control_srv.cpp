@@ -3,7 +3,6 @@
  * @file offboard_control_srv.cpp
  */
 
-#include "offboard_control/Inner_loop.h"
 #include "offboard_control/Inner_loop_geometric_PID.h" // revised PID control
 #include "offboard_control/QSF_w_offset_intctrl_U.h"
 #include "offboard_control/QSF_w_offset_intctrl.h"
@@ -105,8 +104,8 @@ class OffboardControl : public rclcpp::Node {
         // 0 < cI < min(sqrt(kR/Iqxx)/Iqzz, 4*kR*kOmega/(4*kR*Iqzz + kOmega^2))
         kR_ = this->declare_parameter<double>("kR_", 5.0); // 5.0(sim), 2.5(exp)
         kOmega_ = this->declare_parameter<double>("kOmega_", 0.8); //0.8(sim), 0.35(exp)
-        kI_ = this->declare_parameter<double>("kI_", 0.1);
-        cI_ = this->declare_parameter<double>("cI_", 3.0); 
+        kI_ = this->declare_parameter<double>("kI_", 0.0); // enable it seems worse
+        cI_ = this->declare_parameter<double>("cI_", 0.0); // enable it seems worse
 
         // SLS offset Max torque
         sls_offset_params_.tau_x_max_ = this->declare_parameter<double>("tau_x_max_", 4.15*2.21356);
@@ -217,6 +216,7 @@ class OffboardControl : public rclcpp::Node {
 
                 // V_world = R * V_body
                 sls_offset_params_.latest_rate_enu_ = R_body_to_world * ang_vel_body_flu;
+                // sls_offset_params_.latest_rate_enu_ = ang_vel_body_flu; // store in body frame
             });
 
         uav_odom_sub_ =
@@ -243,12 +243,16 @@ class OffboardControl : public rclcpp::Node {
                     
                     sls_offset_params_.latest_vel_enu_ = R_body_to_world * lin_vel;
                     sls_offset_params_.latest_rate_enu_ = R_body_to_world * ang_vel;
+                    // sls_offset_params_.latest_rate_enu_ = ang_vel; // store in body frame
                 } else {
                     // Vicon provides velocities in world frame, no conversion needed
                     sls_offset_params_.latest_vel_enu_ = lin_vel;
                     sls_offset_params_.latest_rate_enu_ = ang_vel;
+                    // Eigen::Quaterniond q_world(msg->pose.pose.orientation.w, msg->pose.pose.orientation.x, 
+                    //                            msg->pose.pose.orientation.y, msg->pose.pose.orientation.z);
+                    // Eigen::Matrix3d R_body_to_world = q_world.toRotationMatrix();
+                    // sls_offset_params_.latest_rate_enu_ = R_body_to_world.transpose() * ang_vel;  // convert world to body frame
                 }
-
                 attitude_received_ = true;
             });
 
@@ -336,14 +340,14 @@ class OffboardControl : public rclcpp::Node {
         // SLS offset parameters and state variables
         Eigen::Vector3d latest_pos_enu_{}, latest_vel_enu_{}, latest_rate_enu_{}, load_pos_enu_{}, load_vel_enu_{}, load_rate_enu_{}, pend_rate_enu_{}, pend_angle_enu_{}, latest_rate_frd_{};
         bool load_received_{false};
-        double load_mass_ = 0.1; // 0.191 kg
+        double load_mass_ = 0.191; // 0.191 kg for experiment
         double R_bi[9];
         Eigen::Matrix3d R_Bd;                      // Desired UAV attitude
         double l = 0.75; // 0.92, Cable length
         double q_vec[3] = {0.0, 0.0, 0.0};
         double dq[3] = {0.0, 0.0, 0.0};
-        double L_offset_[3] = {0.12, -0.12, 0.06}; // Offset of load from UAV in meters (FRD) (x, -y, -z)
-        // double L_offset_[3] = {0.0, 0.0, 0.0};
+        // double L_offset_[3] = {0.12, -0.12, 0.06}; // Offset of load from UAV in meters (FRD) (x, -y, -z)
+        double L_offset_[3] = {0.0, 0.0, 0.0};
         double phi_rad_, theta_rad_, psi_rad_;
         double alpha, beta;                         // load angles
         double dalpha, dbeta;                       // load angle rates
@@ -352,13 +356,9 @@ class OffboardControl : public rclcpp::Node {
         double tau_x_max_, tau_y_max_, tau_z_max_;
 
         // Inner loop tracking variables (if using thrust-torque control)
-        double ddxp, ddyp, ddzp;
-        double dxp_prev = 0.0, dyp_prev = 0.0, dzp_prev = 0.0;
-        double ddxp_prev = 0.0, ddyp_prev = 0.0, ddzp_prev = 0.0;
         double Td_scaler = 1.0;
         double Omegad1 = 0.0, Omegad2 = 0.0, Omegad3 = 0.0;
         double dOmegad1 = 0.0, dOmegad2 = 0.0, dOmegad3 = 0.0;
-        // double ddR1 = 0.0, ddR2 = 0.0, ddR3 = 0.0;
         double aLd1 = 0.0, aLd2 = 0.0, aLd3 = 0.0;
         double integral[3] = {0.0, 0.0, 0.0};
         double Iqxx = 0.020653500000000005; // 
@@ -763,9 +763,10 @@ OffboardControl::sls_offset_ned_params OffboardControl::sls_offset_enu_to_ned(Of
     sls_offset_params.beta = asin(dx / cos(sls_offset_params.alpha));
 
     // q vec calc by swing angles
-    // q[0] = cos(alpha)*sin(beta);
-    // q[1] = -sin(alpha);
-    // q[2] = cos(alpha)*cos(beta);
+    double q[3];
+    // q[0] = cos(sls_offset_params.alpha)*sin(sls_offset_params.beta);
+    // q[1] = -sin(sls_offset_params.alpha);
+    // q[2] = cos(sls_offset_params.alpha)*cos(sls_offset_params.beta);
 
     // Method 2), by normalization
     double pivot_point_pos[3] = {pos_ned.x() + sls_offset_params.R_bi[0] * sls_offset_params.L_offset_[0] + sls_offset_params.R_bi[1] * sls_offset_params.L_offset_[1] +
@@ -776,7 +777,6 @@ OffboardControl::sls_offset_ned_params OffboardControl::sls_offset_enu_to_ned(Of
                                      sls_offset_params.R_bi[8] * sls_offset_params.L_offset_[2]};
     double vec_load_to_pivot[3] = {load_pos_ned.x() - pivot_point_pos[0], load_pos_ned.y() - pivot_point_pos[1], load_pos_ned.z() - pivot_point_pos[2]};
     double norm = sqrt(vec_load_to_pivot[0] * vec_load_to_pivot[0] + vec_load_to_pivot[1] * vec_load_to_pivot[1] + vec_load_to_pivot[2] * vec_load_to_pivot[2]);
-    double q[3];
     q[0] = vec_load_to_pivot[0] / norm;
     q[1] = vec_load_to_pivot[1] / norm;
     q[2] = vec_load_to_pivot[2] / norm;
@@ -793,7 +793,13 @@ OffboardControl::sls_offset_ned_params OffboardControl::sls_offset_enu_to_ned(Of
     Rbi_ << sls_offset_params.R_bi[0], sls_offset_params.R_bi[1], sls_offset_params.R_bi[2], sls_offset_params.R_bi[3], sls_offset_params.R_bi[4], sls_offset_params.R_bi[5], sls_offset_params.R_bi[6],
         sls_offset_params.R_bi[7], sls_offset_params.R_bi[8];
     Eigen::Vector3d Pivot_Vel = vel_ned + Rbi_ * Omega_hat_ * L;
-    load_rate_ned = Eigen::Vector3d(q[0], q[1], q[2]).cross(load_vel_ned - Pivot_Vel);
+    // load_rate_ned = Eigen::Vector3d(q[0], q[1], q[2]).cross(load_vel_ned - Pivot_Vel);
+
+    // gpt fixed:
+    // Eigen::Vector3d L_body = {sls_offset_params.L_offset_[0], sls_offset_params.L_offset_[1], sls_offset_params.L_offset_[2]};
+    // Eigen::Vector3d L_ned = Rbi_*L_body;
+    // Eigen::Vector3d Pivot_Vel = vel_ned + rate_ned.cross(L_ned);
+    load_rate_ned = Eigen::Vector3d(q[0], q[1], q[2]).cross(load_vel_ned - Pivot_Vel)/sls_offset_params.l; // corrected
 
     // Manual calculation of angular rate by finite difference
     static double conversion_last_called_ = 0.0;
@@ -804,15 +810,9 @@ OffboardControl::sls_offset_ned_params OffboardControl::sls_offset_enu_to_ned(Of
     if (dt > FD_EPSILON) {
         sls_offset_params.dalpha = (sls_offset_params.alpha - sls_offset_params.alpha_prev) / dt;
         sls_offset_params.dbeta = (sls_offset_params.beta - sls_offset_params.beta_prev) / dt;
-        sls_offset_params.ddxp = (load_vel_ned.x() - sls_offset_params.dxp_prev) / dt;
-        sls_offset_params.ddyp = (load_vel_ned.y() - sls_offset_params.dyp_prev) / dt;
-        sls_offset_params.ddzp = (load_vel_ned.z() - sls_offset_params.dzp_prev) / dt;
     } else {
         sls_offset_params.dalpha = sls_offset_params.dalpha_prev;
         sls_offset_params.dbeta = sls_offset_params.dbeta_prev;
-        sls_offset_params.ddxp = sls_offset_params.ddxp_prev;
-        sls_offset_params.ddyp = sls_offset_params.ddyp_prev;
-        sls_offset_params.ddzp = sls_offset_params.ddzp_prev;
     }
 
     // calculate dq/dt by direct formula
@@ -828,12 +828,6 @@ OffboardControl::sls_offset_ned_params OffboardControl::sls_offset_enu_to_ned(Of
     sls_offset_params.beta_prev = sls_offset_params.beta;
     sls_offset_params.dalpha_prev = sls_offset_params.dalpha;
     sls_offset_params.dbeta_prev = sls_offset_params.dbeta;
-    sls_offset_params.dxp_prev = load_vel_ned.x();
-    sls_offset_params.dyp_prev = load_vel_ned.y();
-    sls_offset_params.dzp_prev = load_vel_ned.z();
-    sls_offset_params.ddxp_prev = sls_offset_params.ddxp;
-    sls_offset_params.ddyp_prev = sls_offset_params.ddyp;
-    sls_offset_params.ddzp_prev = sls_offset_params.ddzp;
 
     // Create return struct
     sls_offset_ned_params sls_offset_ned{
@@ -933,14 +927,7 @@ Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thru
     double Omegad[3] = {sls_offset_params_.Omegad1, sls_offset_params_.Omegad2, sls_offset_params_.Omegad3};
     double dOmegad[3] = {sls_offset_params_.dOmegad1, sls_offset_params_.dOmegad2, sls_offset_params_.dOmegad3};
     double rpy_angles[3] = {sls_offset_params_.phi_rad_, sls_offset_params_.theta_rad_, sls_offset_params_.psi_rad_};
-    double load_acc[3] = {sls_offset_params_.ddxp, sls_offset_params_.ddyp, sls_offset_params_.ddzp};
     double taub[3], tau[3], rate_sp_dt[3];
-
-    // double ddxi_flat[3] = {mass_ * sls_offset_params_.ddR1, mass_ * sls_offset_params_.ddR2, mass_ * sls_offset_params_.ddR3}; // for QSF diff_flat
-    // double gains[2] = {kR_, kOmega_};
-    // double physics_parameters[6] = {mass_, sls_offset_params_.load_mass_, gravity_, sls_offset_params_.Iqxx, sls_offset_params_.Iqyy, sls_offset_params_.Iqzz};
-    // Inner_loop(rpy_angles, Omega, sls_offset_params_.R_Bd.data(), Omegad, dOmegad, -mass_ * thrust_command, gains, physics_parameters, sls_offset_params_.L_offset_, ddxi_flat, load_acc, taub, tau,
-    //            rate_sp_dt); // geometric PD control (requires load acc. and ddR_flatness), deprecated
 
     // geometric PID control
     double q_vec_[3] = {sls_offset_params_.q_vec[0], sls_offset_params_.q_vec[1], sls_offset_params_.q_vec[2]};
