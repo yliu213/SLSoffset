@@ -206,17 +206,8 @@ class OffboardControl : public rclcpp::Node {
 
                 // msg->velocity is already in the world frame (NED). Just map to ENU.
                 sls_offset_params_.latest_vel_enu_ = Eigen::Vector3d(msg->velocity[1], msg->velocity[0], -msg->velocity[2]);
-
-                // Rotate Body Frame Twist to World Frame (ENU)
-                Eigen::Quaterniond q_world(latest_attitude_(0), latest_attitude_(1), latest_attitude_(2), latest_attitude_(3));
-                // q_world.normalize();
-                Eigen::Matrix3d R_body_to_world = q_world.toRotationMatrix();
-
-                // Convert FRD body rates to FLU body rates (invert Y and Z)
-                Eigen::Vector3d ang_vel_body_flu(msg->angular_velocity[0], -msg->angular_velocity[1], -msg->angular_velocity[2]);
-
-                // V_world = R * V_body
-                sls_offset_params_.latest_rate_enu_ = R_body_to_world * ang_vel_body_flu;
+                // FRD angular rates
+                sls_offset_params_.latest_rate_frd_ = Eigen::Vector3d(msg->angular_velocity[0], msg->angular_velocity[1], msg->angular_velocity[2]);
             });
 
         // gz and vicon odometry subscribers
@@ -245,15 +236,20 @@ class OffboardControl : public rclcpp::Node {
                     sls_offset_params_.latest_vel_enu_ = R_body_to_world * lin_vel;
                     sls_offset_params_.latest_rate_frd_ = Eigen::Vector3d(ang_vel.x(), -ang_vel.y(), -ang_vel.z()); // FLU -> FRD
                 } else {
-                    // Vicon provides velocities in world frame, no conversion needed
+                    // Vicon provides velocities in world frame (ENU)
                     sls_offset_params_.latest_vel_enu_ = lin_vel;
-                    sls_offset_params_.latest_rate_enu_ = ang_vel;
+                    // ENU -> FRD angular rates
+                    Eigen::Quaterniond q_world(msg->pose.pose.orientation.w, msg->pose.pose.orientation.x,
+                                               msg->pose.pose.orientation.y, msg->pose.pose.orientation.z);
+                    Eigen::Matrix3d R_body_to_world = q_world.toRotationMatrix();
+                    Eigen::Vector3d omega_body_flu = R_body_to_world.transpose() * ang_vel;
+                    sls_offset_params_.latest_rate_frd_ = Eigen::Vector3d(omega_body_flu.x(), -omega_body_flu.y(), -omega_body_flu.z());
                 }
                 attitude_received_ = true;
             });
 
+        // gz and vicon load odometry subscribers
         load_odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(load_topic, rclcpp::SensorDataQoS(), [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
-            // RCLCPP_INFO(this->get_logger(), "integral_limit: %f", integral_limit_);::INF
             // Load Position
             sls_offset_params_.load_pos_enu_ << msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z;
 
