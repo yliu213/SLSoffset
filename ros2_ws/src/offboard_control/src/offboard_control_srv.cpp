@@ -168,7 +168,8 @@ class OffboardControl : public rclcpp::Node {
                 if (is_offboard_ && !was_offboard) {
                     RCLCPP_INFO(this->get_logger(), "Offboard mode engaged.");
                     start_time_ = this->now();
-                    reset_integral_ = true; // Reset integral when entering offboard mode
+                    reset_qsf_integral_ = true;
+                    reset_inner_integral_ = true; // Reset integral when entering offboard mode
                     RCLCPP_INFO(this->get_logger(), "Resetting integral state for QSF offset controller.");
                 } else if (!is_offboard_ && was_offboard) {
                     RCLCPP_INFO(this->get_logger(), "Offboard mode disengaged.");
@@ -329,7 +330,8 @@ class OffboardControl : public rclcpp::Node {
     // Data Source Toggles
     bool use_sim_{true};
     bool use_ekf_{false};
-    bool reset_integral_{false};
+    bool reset_qsf_integral_{false};
+    bool reset_inner_integral_{false};
 
     // SLS Offset Gains
     struct sls_offset_params {
@@ -349,10 +351,10 @@ class OffboardControl : public rclcpp::Node {
         // double L_offset_[3] = {0.12, -0.12, 0.06}; // Offset of load from UAV in meters (FRD) (x, -y, -z)
         double L_offset_[3] = {0.0, 0.0, 0.0};
         double phi_rad_, theta_rad_, psi_rad_;
-        double alpha, beta;                         // load angles
-        double dalpha, dbeta;                       // load angle rates
-        double alpha_prev = 0.0, beta_prev = 0.0;   // previous load angles
-        double dalpha_prev = 0.0, dbeta_prev = 0.0; // previous load angle rates
+        // double alpha, beta;                         // load angles
+        // double dalpha, dbeta;                       // load angle rates
+        // double alpha_prev = 0.0, beta_prev = 0.0;   // previous load angles
+        // double dalpha_prev = 0.0, dbeta_prev = 0.0; // previous load angle rates
         double tau_x_max_, tau_y_max_, tau_z_max_;
 
         // Inner loop tracking variables (if using thrust-torque control)
@@ -750,18 +752,18 @@ OffboardControl::sls_offset_ned_params OffboardControl::sls_offset_enu_to_ned(Of
     m_uav.getRPY(sls_offset_params.phi_rad_, sls_offset_params.theta_rad_, sls_offset_params.psi_rad_);
 
     // Find load angles
-    double dx, dy, dz;
-    dx = (load_pos_ned.x() - (pos_ned.x() + sls_offset_params.R_bi[0] * sls_offset_params.L_offset_[0] + sls_offset_params.R_bi[1] * sls_offset_params.L_offset_[1] +
-                              sls_offset_params.R_bi[2] * sls_offset_params.L_offset_[2])) /
-         sls_offset_params.l;
-    dy = (load_pos_ned.y() - (pos_ned.y() + sls_offset_params.R_bi[3] * sls_offset_params.L_offset_[0] + sls_offset_params.R_bi[4] * sls_offset_params.L_offset_[1] +
-                              sls_offset_params.R_bi[5] * sls_offset_params.L_offset_[2])) /
-         sls_offset_params.l;
-    dz = (load_pos_ned.z() - (pos_ned.z() + sls_offset_params.R_bi[6] * sls_offset_params.L_offset_[0] + sls_offset_params.R_bi[7] * sls_offset_params.L_offset_[1] +
-                              sls_offset_params.R_bi[8] * sls_offset_params.L_offset_[2])) /
-         sls_offset_params.l;
-    sls_offset_params.alpha = asin(-dy);
-    sls_offset_params.beta = asin(dx / cos(sls_offset_params.alpha));
+    // double dx, dy, dz;
+    // dx = (load_pos_ned.x() - (pos_ned.x() + sls_offset_params.R_bi[0] * sls_offset_params.L_offset_[0] + sls_offset_params.R_bi[1] * sls_offset_params.L_offset_[1] +
+    //                           sls_offset_params.R_bi[2] * sls_offset_params.L_offset_[2])) /
+    //      sls_offset_params.l;
+    // dy = (load_pos_ned.y() - (pos_ned.y() + sls_offset_params.R_bi[3] * sls_offset_params.L_offset_[0] + sls_offset_params.R_bi[4] * sls_offset_params.L_offset_[1] +
+    //                           sls_offset_params.R_bi[5] * sls_offset_params.L_offset_[2])) /
+    //      sls_offset_params.l;
+    // dz = (load_pos_ned.z() - (pos_ned.z() + sls_offset_params.R_bi[6] * sls_offset_params.L_offset_[0] + sls_offset_params.R_bi[7] * sls_offset_params.L_offset_[1] +
+    //                           sls_offset_params.R_bi[8] * sls_offset_params.L_offset_[2])) /
+    //      sls_offset_params.l;
+    // sls_offset_params.alpha = asin(-dy);
+    // sls_offset_params.beta = asin(dx / cos(sls_offset_params.alpha));
 
     // q vec calc by swing angles
     double q[3];
@@ -780,7 +782,7 @@ OffboardControl::sls_offset_ned_params OffboardControl::sls_offset_enu_to_ned(Of
     double norm = sqrt(vec_load_to_pivot[0] * vec_load_to_pivot[0] + vec_load_to_pivot[1] * vec_load_to_pivot[1] + vec_load_to_pivot[2] * vec_load_to_pivot[2]);
     q[0] = vec_load_to_pivot[0] / norm;
     q[1] = vec_load_to_pivot[1] / norm;
-    q[2] = vec_load_to_pivot[2] / norm;
+    q[2] = vec_load_to_pivot[2] / norm; // omit division by l, since q is normalized anyway
     sls_offset_params.q_vec[0] = q[0];
     sls_offset_params.q_vec[1] = q[1];
     sls_offset_params.q_vec[2] = q[2];
@@ -797,32 +799,39 @@ OffboardControl::sls_offset_ned_params OffboardControl::sls_offset_enu_to_ned(Of
     load_rate_ned = Eigen::Vector3d(q[0], q[1], q[2]).cross(load_vel_ned - Pivot_Vel)/sls_offset_params.l; // corrected
 
     // Manual calculation of angular rate by finite difference
-    static double conversion_last_called_ = 0.0;
-    double current_time = this->get_clock()->now().seconds();
-    double dt = current_time - conversion_last_called_;
-    conversion_last_called_ = current_time;
+    // static double conversion_last_called_ = 0.0;
+    // double current_time = this->get_clock()->now().seconds();
+    // double dt = current_time - conversion_last_called_;
+    // conversion_last_called_ = current_time;
 
-    if (dt > FD_EPSILON) {
-        sls_offset_params.dalpha = (sls_offset_params.alpha - sls_offset_params.alpha_prev) / dt;
-        sls_offset_params.dbeta = (sls_offset_params.beta - sls_offset_params.beta_prev) / dt;
-    } else {
-        sls_offset_params.dalpha = sls_offset_params.dalpha_prev;
-        sls_offset_params.dbeta = sls_offset_params.dbeta_prev;
-    }
+    // if (dt > FD_EPSILON) {
+    //     sls_offset_params.dalpha = (sls_offset_params.alpha - sls_offset_params.alpha_prev) / dt;
+    //     sls_offset_params.dbeta = (sls_offset_params.beta - sls_offset_params.beta_prev) / dt;
+    // } else {
+    //     sls_offset_params.dalpha = sls_offset_params.dalpha_prev;
+    //     sls_offset_params.dbeta = sls_offset_params.dbeta_prev;
+    // }
 
-    // calculate dq/dt by direct formula
-    const double alpha  = sls_offset_params.alpha;
-    const double beta   = sls_offset_params.beta;
-    const double dalpha = sls_offset_params.dalpha;
-    const double dbeta  = sls_offset_params.dbeta;
-    sls_offset_params.dq[0] = dbeta * std::cos(beta) * std::cos(alpha) - std::sin(beta) * dalpha * std::sin(alpha);
-    sls_offset_params.dq[1] = -dalpha * std::cos(alpha);
-    sls_offset_params.dq[2] = -dbeta * std::sin(beta) * std::cos(alpha) - std::cos(beta) * dalpha * std::sin(alpha);
+    // // calculate dq/dt by direct formula
+    // const double alpha  = sls_offset_params.alpha;
+    // const double beta   = sls_offset_params.beta;
+    // const double dalpha = sls_offset_params.dalpha;
+    // const double dbeta  = sls_offset_params.dbeta;
+    // sls_offset_params.dq[0] = dbeta * std::cos(beta) * std::cos(alpha) - std::sin(beta) * dalpha * std::sin(alpha);
+    // sls_offset_params.dq[1] = -dalpha * std::cos(alpha);
+    // sls_offset_params.dq[2] = -dbeta * std::sin(beta) * std::cos(alpha) - std::cos(beta) * dalpha * std::sin(alpha);
 
-    sls_offset_params.alpha_prev = sls_offset_params.alpha;
-    sls_offset_params.beta_prev = sls_offset_params.beta;
-    sls_offset_params.dalpha_prev = sls_offset_params.dalpha;
-    sls_offset_params.dbeta_prev = sls_offset_params.dbeta;
+    // dq = w x q
+    Eigen::Vector3d q_eigen(q[0], q[1], q[2]);
+    Eigen::Vector3d dq_eigen = load_rate_ned.cross(q_eigen);
+    sls_offset_params.dq[0] = dq_eigen.x();
+    sls_offset_params.dq[1] = dq_eigen.y();
+    sls_offset_params.dq[2] = dq_eigen.z();
+
+    // sls_offset_params.alpha_prev = sls_offset_params.alpha;
+    // sls_offset_params.beta_prev = sls_offset_params.beta;
+    // sls_offset_params.dalpha_prev = sls_offset_params.dalpha;
+    // sls_offset_params.dbeta_prev = sls_offset_params.dbeta;
 
     // Create return struct
     sls_offset_ned_params sls_offset_ned{
@@ -883,11 +892,11 @@ std::tuple<Eigen::Vector4d, std::pair<Eigen::Vector3d, double>, Eigen::Vector3d>
         }
 
         // reset integral if not in offboard mode
-        if (reset_integral_) {
+        if (reset_qsf_integral_) {
             sls_offset_params_.integral[i] = 0.0;
         }
     }
-    reset_integral_ = false;
+    reset_qsf_integral_ = false;
 
     // Save data
     // Filled column-wise, see codegen for reason
@@ -897,7 +906,7 @@ std::tuple<Eigen::Vector4d, std::pair<Eigen::Vector3d, double>, Eigen::Vector3d>
         }
     }
 
-    // Middle loop debug only
+    // debug only
     // thetad_deg_ = thetad * 180.0 / M_PI;
     // phid_deg_ = phid * 180.0 / M_PI;
 
@@ -949,12 +958,12 @@ Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thru
                              gains, physics_parameters, sls_offset_params_.L_offset_, eI, taub, tau, rate_sp_dt, rate_sp_dt2, eI_dt); 
 
     // reset integral if not in offboard mode
-    if (reset_integral_) {
+    if (reset_inner_integral_) {
         for (int i = 0; i < 3; i++) {
             eI[i] = 0.0;
         }
         first_call_inner_loop_ = true;
-        reset_integral_ = false;
+        reset_inner_integral_ = false;
     } else {
         for(int i = 0; i < 3; i++) {
             if (std::isfinite(eI_dt[i])) {
