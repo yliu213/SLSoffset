@@ -915,8 +915,7 @@ std::tuple<Eigen::Vector4d, std::pair<Eigen::Vector3d, double>, Eigen::Vector3d>
 
 Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thrust_command) {
     // Angular velocites
-    Eigen::Vector3d rate_frd(sls_offset_params_.latest_rate_frd_.x(), sls_offset_params_.latest_rate_frd_.y(), sls_offset_params_.latest_rate_frd_.z());
-    double Omega[3] = {rate_frd.x(), rate_frd.y(), rate_frd.z()};
+    double Omega[3] = {sls_offset_params_.latest_rate_frd_.x(), sls_offset_params_.latest_rate_frd_.y(), sls_offset_params_.latest_rate_frd_.z()};
     double Omegad[3] = {sls_offset_params_.Omegad1, sls_offset_params_.Omegad2, sls_offset_params_.Omegad3};
     double dOmegad[3] = {sls_offset_params_.dOmegad1, sls_offset_params_.dOmegad2, sls_offset_params_.dOmegad3};
     double rpy_angles[3] = {sls_offset_params_.phi_rad_, sls_offset_params_.theta_rad_, sls_offset_params_.psi_rad_};
@@ -992,8 +991,7 @@ void OffboardControl::sls_offset_differential_flatness() {
 
     // flatness based on low angular acc.
     double aLd[3], snapd[3];
-    Eigen::Vector3d rate_frd(sls_offset_params_.latest_rate_enu_.y(), sls_offset_params_.latest_rate_enu_.x(), -sls_offset_params_.latest_rate_enu_.z());
-    double Omega[3] = {rate_frd.x(), rate_frd.y(), rate_frd.z()};
+    double Omega[3] = {sls_offset_params_.latest_rate_frd_.x(), sls_offset_params_.latest_rate_frd_.y(), sls_offset_params_.latest_rate_frd_.z()};
     Flatness_mission_spfig8(t, sls_offset_params_.load_mass_, mass_, gravity_, sls_offset_params_.l, sls_offset_params_.L_offset_, 
                             sls_offset_params_.phi_rad_, sls_offset_params_.theta_rad_, sls_offset_params_.psi_rad_, Omega, 
                             /*A=*/1.5, /*B=*/1.0, /*omega=*/0.4,
