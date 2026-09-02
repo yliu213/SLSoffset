@@ -27,7 +27,9 @@
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2/LinearMath/Quaternion.h>
 
-#include <geometry_msgs/msg/pose_stamped.hpp>
+// #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <geometry_msgs/msg/pose_array.hpp>
+#include <geometry_msgs/msg/wrench_stamped.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -108,7 +110,7 @@ class OffboardControl : public rclcpp::Node {
         cI_ = this->declare_parameter<double>("cI_", 0.0); // enable it seems worse in sim
 
         // SLS offset Max torque
-        sls_offset_params_.tau_x_max_ = this->declare_parameter<double>("tau_x_max_", 4.15*2.21356);
+        sls_offset_params_.tau_x_max_ = this->declare_parameter<double>("tau_x_max_", 4.15*2.21356); // 4.15*2.21356
         sls_offset_params_.tau_y_max_ = this->declare_parameter<double>("tau_y_max_", 4.15*2.21356);
         sls_offset_params_.tau_z_max_ = this->declare_parameter<double>("tau_z_max_", 2.5); // 2.5 for exp, 0.35 for sim
 
@@ -132,6 +134,8 @@ class OffboardControl : public rclcpp::Node {
         rate_setpoint_publisher_ = this->create_publisher<VehicleRatesSetpoint>(px4_namespace + "in/vehicle_rates_setpoint", rclcpp::SensorDataQoS());
         torque_setpoint_publisher_ = this->create_publisher<VehicleTorqueSetpoint>(px4_namespace + "in/vehicle_torque_setpoint", rclcpp::SensorDataQoS());
         thrust_setpoint_publisher_ = this->create_publisher<VehicleThrustSetpoint>(px4_namespace + "in/vehicle_thrust_setpoint", rclcpp::SensorDataQoS());
+        qsf_attitude_debug_publisher_ = this->create_publisher<geometry_msgs::msg::PoseArray>("debug/qsf_attitude", 10);
+        controller_output_debug_publisher_ = this->create_publisher<geometry_msgs::msg::WrenchStamped>("debug/qsf_controller_output", 10);
 
         // Subscribers
         vehicle_local_position_subscriber_ = this->create_subscription<px4_msgs::msg::VehicleLocalPosition>(
@@ -284,6 +288,8 @@ class OffboardControl : public rclcpp::Node {
     rclcpp::Publisher<VehicleRatesSetpoint>::SharedPtr rate_setpoint_publisher_;
     rclcpp::Publisher<VehicleTorqueSetpoint>::SharedPtr torque_setpoint_publisher_;
     rclcpp::Publisher<VehicleThrustSetpoint>::SharedPtr thrust_setpoint_publisher_;
+    rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr qsf_attitude_debug_publisher_; // attitude tracking debug
+    rclcpp::Publisher<geometry_msgs::msg::WrenchStamped>::SharedPtr controller_output_debug_publisher_; // controller output debug
     rclcpp::Publisher<TrajectorySetpoint>::SharedPtr trajectory_setpoint_publisher_;
     rclcpp::Publisher<TrajectorySetpoint>::SharedPtr debug_trajectory_setpoint_publisher_;
 
@@ -351,6 +357,7 @@ class OffboardControl : public rclcpp::Node {
 
         // Inner loop tracking variables (if using thrust-torque control)
         double Td_scaler = 1.0;
+        double des_thrust = 0.0;
         double Omegad1 = 0.0, Omegad2 = 0.0, Omegad3 = 0.0;
         double dOmegad1 = 0.0, dOmegad2 = 0.0, dOmegad3 = 0.0;
         double aLd1 = 0.0, aLd2 = 0.0, aLd3 = 0.0;
@@ -402,6 +409,8 @@ class OffboardControl : public rclcpp::Node {
     inline Eigen::Vector4d rotation_matrix_to_quaternion(const Eigen::Matrix3d &R);
     inline Eigen::Matrix3d quaternion_to_rotation_matrix(const Eigen::Vector4d &q);
     inline Eigen::Vector4d multiply_quaternion(const Eigen::Vector4d &q, const Eigen::Vector4d &p);
+    void publish_qsf_attitude_debug();
+    void publish_qsf_controller_output(double des_thrust, const double tau[3]);
 };
 
 /**
@@ -855,7 +864,7 @@ std::tuple<Eigen::Vector4d, std::pair<Eigen::Vector3d, double>, Eigen::Vector3d>
                          sls_ned_params.load_rate.x(), sls_ned_params.load_rate.y(), sls_ned_params.load_rate.z()};
 
     // Apply QSF offset control (proposed) (U-model)
-    double des_thrust, thetad, phid;
+    double thetad, phid;
     double Rbd[9];
     // QSF_w_offset_intctrl_U(mass_, sls_offset_params_.l, gravity_, 
     //                        K1_int, K2_int, K3_int, ref_traj, states, sls_offset_params_.psi_rad_, 
@@ -867,7 +876,7 @@ std::tuple<Eigen::Vector4d, std::pair<Eigen::Vector3d, double>, Eigen::Vector3d>
     QSF_w_offset_intctrl(sls_offset_params_.load_mass_, mass_, sls_offset_params_.l, gravity_, 
                          K1_int, K2_int, K3_int, ref_traj, states, sls_offset_params_.psi_rad_, 
                          aLd, sls_offset_params_.integral, 
-                         Rbd, &des_thrust, &phid, &thetad);
+                         Rbd, &sls_offset_params_.des_thrust, &phid, &thetad);
 
     // Update integral
     static rclcpp::Time last_time_QSF = this->get_clock()->now();
@@ -897,13 +906,14 @@ std::tuple<Eigen::Vector4d, std::pair<Eigen::Vector3d, double>, Eigen::Vector3d>
     // phid_deg_ = phid * 180.0 / M_PI;
 
     // Convert to desired attitudes and thrust (acceleration) for attitude/rate control
-    auto thrust_command = -des_thrust / mass_;
+    auto thrust_command = -sls_offset_params_.des_thrust / mass_;
 
     // QSF matrix is NED. Convert it back to ENU so the quaternion math and publishers work
     Eigen::Vector4d q_des_ned = rotation_matrix_to_quaternion(sls_offset_params_.R_Bd);
     Eigen::Quaterniond q_ned_obj(q_des_ned(0), q_des_ned(1), q_des_ned(2), q_des_ned(3));
     Eigen::Quaterniond q_enu_obj = px4_ros_com::frame_transforms::px4_to_ros_orientation(q_ned_obj);
     Eigen::Vector4d q_des_enu(q_enu_obj.w(), q_enu_obj.x(), q_enu_obj.y(), q_enu_obj.z());
+    publish_qsf_attitude_debug(); // attitude debug publish
 
     auto rate_thrust_cmd = sls_offset_attitude_to_body_rate_and_thrust(latest_attitude_, q_des_enu, thrust_command);
     auto torque_cmd = sls_offset_thrust_torque_inner_loop(thrust_command);
@@ -958,6 +968,8 @@ Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thru
             eI[i] = std::clamp(eI[i] + (eI_dt[i] * dt), -10.0, 10.0);
         }
     }
+
+    publish_qsf_controller_output(sls_offset_params_.des_thrust, tau);
 
     // Normalize tau for torque and thrust setpoint to [-1, 1]
     tau[0] = std::clamp(tau[0] / sls_offset_params_.tau_x_max_, -1.0, 1.0);
@@ -1121,6 +1133,66 @@ std::pair<Eigen::Vector3d, double> OffboardControl::attitude_to_body_rate_and_th
     //     | norm_thrust: %.3f | hover_param: %.3f", ref_acc(2), zb(2),
     //     desired_thrust, normalized_thrust, hover_thrust_);
     return {desired_rate, normalized_thrust};
+}
+
+void OffboardControl::publish_qsf_controller_output(double des_thrust, const double tau[3]) {
+    geometry_msgs::msg::WrenchStamped msg{};
+
+    msg.header.stamp = this->now();
+    msg.header.frame_id = "frd";
+
+    // QSF thrust output [N]
+    msg.wrench.force.x = 0.0;
+    msg.wrench.force.y = 0.0;
+    msg.wrench.force.z = des_thrust; // thrust force magnitude
+
+    // Inner-loop torque output before normalization [N m]
+    msg.wrench.torque.x = tau[0];
+    msg.wrench.torque.y = tau[1];
+    msg.wrench.torque.z = tau[2];
+
+    controller_output_debug_publisher_->publish(msg);
+}
+
+void OffboardControl::publish_qsf_attitude_debug() {
+    geometry_msgs::msg::PoseArray msg;
+
+    msg.header.stamp = this->now();
+    msg.header.frame_id = "ned";
+
+    msg.poses.resize(2);
+
+    // --------------------------------------------------
+    // pose[0]: desired attitude R_Bd
+    // R_Bd is already NED / FRD
+    // --------------------------------------------------
+    Eigen::Vector4d q_des_vec = rotation_matrix_to_quaternion(sls_offset_params_.R_Bd);
+
+    Eigen::Quaterniond q_des_ned(q_des_vec(0), q_des_vec(1), q_des_vec(2),q_des_vec(3));
+    q_des_ned.normalize();
+
+    msg.poses[0].orientation.w = q_des_ned.w();
+    msg.poses[0].orientation.x = q_des_ned.x();
+    msg.poses[0].orientation.y = q_des_ned.y();
+    msg.poses[0].orientation.z = q_des_ned.z();
+
+
+    // --------------------------------------------------
+    // pose[1]: actual UAV attitude
+    // latest_attitude_ is stored as ENU / FLU,
+    // so convert back to NED / FRD.
+    // --------------------------------------------------
+    Eigen::Quaterniond q_actual_enu(latest_attitude_(0), latest_attitude_(1), latest_attitude_(2), latest_attitude_(3));
+    q_actual_enu.normalize();
+    Eigen::Quaterniond q_actual_ned = px4_ros_com::frame_transforms::ros_to_px4_orientation(q_actual_enu);
+    q_actual_ned.normalize();
+
+    msg.poses[1].orientation.w = q_actual_ned.w();
+    msg.poses[1].orientation.x = q_actual_ned.x();
+    msg.poses[1].orientation.y = q_actual_ned.y();
+    msg.poses[1].orientation.z = q_actual_ned.z();
+
+    qsf_attitude_debug_publisher_->publish(msg);
 }
 
 void OffboardControl::publish_attitude_setpoints(const double &thrust_cmd, const Eigen::Vector4d &target_attitude_enu) {
