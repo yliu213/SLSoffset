@@ -979,7 +979,7 @@ Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thru
     Inner_loop_geometric_PID(rpy_angles, q_vec_, dq_vec, Omega, sls_offset_params_.R_Bd.data(), Omegad, dOmegad, -mass_ * thrust_command, 
                              gains, physics_parameters, sls_offset_params_.L_offset_, eI, taub, tau, rate_sp_dt, rate_sp_dt2, eI_dt); 
 
-    // accumlate integral after 5s to avoid large s.s. error due to windup at start of flight
+    // accumlate integral after 5s to prevent inital error being mistaken as a persistent disturbance
     if((this->get_clock()->now() - start_time_).seconds() >= 5.0){       
         for(int i = 0; i < 3; i++) {
             if (std::isfinite(eI_dt[i])) {
