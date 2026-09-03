@@ -30,6 +30,7 @@
 // #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/pose_array.hpp>
 #include <geometry_msgs/msg/wrench_stamped.hpp>
+#include <geometry_msgs/msg/vector3_stamped.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -95,9 +96,9 @@ class OffboardControl : public rclcpp::Node {
         RCLCPP_INFO(this->get_logger(), "Using EKF: %s", use_ekf_ ? "TRUE" : "FALSE");
 
         // Inertia matrix parameters
-        sls_offset_params_.Iqxx = this->declare_parameter<double>("Iqxx", 0.020653500000000005);
-        sls_offset_params_.Iqyy = this->declare_parameter<double>("Iqyy", 0.020653500000000005);
-        sls_offset_params_.Iqzz = this->declare_parameter<double>("Iqzz", 0.04046400000000001);
+        sls_offset_params_.Iqxx = this->declare_parameter<double>("Iqxx", 0.020653500000000005); // 0.020653500000000005
+        sls_offset_params_.Iqyy = this->declare_parameter<double>("Iqyy", 0.020653500000000005); // 0.020653500000000005
+        sls_offset_params_.Iqzz = this->declare_parameter<double>("Iqzz", 0.04046400000000001); // 0.04046400000000001
         // double Iqxx = 0.02091; // experiment values
         // double Iqyy = 0.02091;
         // double Iqzz = 0.02934;
@@ -106,11 +107,11 @@ class OffboardControl : public rclcpp::Node {
         // 0 < cI < min(sqrt(kR/Iqxx)/Iqzz, 4*kR*kOmega/(4*kR*Iqzz + kOmega^2))
         kR_ = this->declare_parameter<double>("kR_", 5.0); // 5.0(sim), 2.5(exp)
         kOmega_ = this->declare_parameter<double>("kOmega_", 0.8); //0.8(sim), 0.35(exp)
-        kI_ = this->declare_parameter<double>("kI_", 0.0); // enable it seems worse in sim
-        cI_ = this->declare_parameter<double>("cI_", 0.0); // enable it seems worse in sim
+        kI_ = this->declare_parameter<double>("kI_", 0.1); // 0.1 try this with exp
+        cI_ = this->declare_parameter<double>("cI_", 0.5); // 0.5 try this with exp
 
         // SLS offset Max torque
-        sls_offset_params_.tau_x_max_ = this->declare_parameter<double>("tau_x_max_", 4.15*2.21356); // 4.15*2.21356
+        sls_offset_params_.tau_x_max_ = this->declare_parameter<double>("tau_x_max_", 4.15*2.21356); // 4.15*3.21356 for exp
         sls_offset_params_.tau_y_max_ = this->declare_parameter<double>("tau_y_max_", 4.15*2.21356);
         sls_offset_params_.tau_z_max_ = this->declare_parameter<double>("tau_z_max_", 2.5); // 2.5 for exp, 0.35 for sim
 
@@ -136,6 +137,7 @@ class OffboardControl : public rclcpp::Node {
         thrust_setpoint_publisher_ = this->create_publisher<VehicleThrustSetpoint>(px4_namespace + "in/vehicle_thrust_setpoint", rclcpp::SensorDataQoS());
         qsf_attitude_debug_publisher_ = this->create_publisher<geometry_msgs::msg::PoseArray>("debug/qsf_attitude", 10);
         controller_output_debug_publisher_ = this->create_publisher<geometry_msgs::msg::WrenchStamped>("debug/qsf_controller_output", 10);
+        inner_integral_debug_publisher_ =this->create_publisher<geometry_msgs::msg::Vector3Stamped>("/debug/qsf_inner_integral", 10);
 
         // Subscribers
         vehicle_local_position_subscriber_ = this->create_subscription<px4_msgs::msg::VehicleLocalPosition>(
@@ -290,6 +292,7 @@ class OffboardControl : public rclcpp::Node {
     rclcpp::Publisher<VehicleThrustSetpoint>::SharedPtr thrust_setpoint_publisher_;
     rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr qsf_attitude_debug_publisher_; // attitude tracking debug
     rclcpp::Publisher<geometry_msgs::msg::WrenchStamped>::SharedPtr controller_output_debug_publisher_; // controller output debug
+    rclcpp::Publisher<geometry_msgs::msg::Vector3Stamped>::SharedPtr inner_integral_debug_publisher_;
     rclcpp::Publisher<TrajectorySetpoint>::SharedPtr trajectory_setpoint_publisher_;
     rclcpp::Publisher<TrajectorySetpoint>::SharedPtr debug_trajectory_setpoint_publisher_;
 
@@ -346,8 +349,8 @@ class OffboardControl : public rclcpp::Node {
         double l = 0.75; // 0.92, Cable length
         double q_vec[3] = {0.0, 0.0, 0.0};
         double dq[3] = {0.0, 0.0, 0.0};
-        // double L_offset_[3] = {0.12, -0.12, 0.06}; // Offset of load from UAV in meters (FRD) (x, -y, -z)
-        double L_offset_[3] = {0.0, 0.0, 0.0};
+        double L_offset_[3] = {0.12, -0.12, 0.06}; // Offset of load from UAV in meters (FRD) (x, -y, -z)
+        // double L_offset_[3] = {0.0, 0.0, 0.0};
         double phi_rad_, theta_rad_, psi_rad_;
         // double alpha, beta;                         // load angles
         // double dalpha, dbeta;                       // load angle rates
@@ -363,9 +366,9 @@ class OffboardControl : public rclcpp::Node {
         double aLd1 = 0.0, aLd2 = 0.0, aLd3 = 0.0;
         double snapd1 = 0.0, snapd2 = 0.0, snapd3 = 0.0;
         double integral[3] = {0.0, 0.0, 0.0};
-        double Iqxx = 0.020653500000000005; // 
-        double Iqyy = 0.020653500000000005; // 
-        double Iqzz = 0.04046400000000001;  // 
+        double Iqxx; // 
+        double Iqyy; // 
+        double Iqzz;  // 
     } sls_offset_params_;
 
     struct sls_offset_ned_params {
@@ -411,6 +414,7 @@ class OffboardControl : public rclcpp::Node {
     inline Eigen::Vector4d multiply_quaternion(const Eigen::Vector4d &q, const Eigen::Vector4d &p);
     void publish_qsf_attitude_debug();
     void publish_qsf_controller_output(double des_thrust, const double tau[3]);
+    void publish_inner_integral_debug(const double eI[3]);
 };
 
 /**
@@ -445,6 +449,19 @@ rcl_interfaces::msg::SetParametersResult OffboardControl::parameters_callback(co
             ref_rate_limit_ = param.as_double();
         else if (param.get_name() == "att_control_type_")
             att_control_type_ = param.as_string();
+        else if (param.get_name() == "flight_path") {
+            std::string new_flight_path = param.as_string();
+            // Start the differential-flatness mission clock
+            // when switching into setpoints_figure8.
+            if (
+                new_flight_path == "setpoints_figure8"
+                && flight_path_ != "setpoints_figure8"
+            ) {
+                start_time_ = this->now();
+            }
+
+            flight_path_ = new_flight_path;
+        }
 
         else if (param.get_name() == "Kx_int")
             sls_offset_params_.Kx_int = param.as_double();
@@ -962,13 +979,17 @@ Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thru
     Inner_loop_geometric_PID(rpy_angles, q_vec_, dq_vec, Omega, sls_offset_params_.R_Bd.data(), Omegad, dOmegad, -mass_ * thrust_command, 
                              gains, physics_parameters, sls_offset_params_.L_offset_, eI, taub, tau, rate_sp_dt, rate_sp_dt2, eI_dt); 
 
-    for(int i = 0; i < 3; i++) {
-        if (std::isfinite(eI_dt[i])) {
-            // clamp integral state to [-10, 10] to prevent too much windup
-            eI[i] = std::clamp(eI[i] + (eI_dt[i] * dt), -10.0, 10.0);
+    // accumlate integral after 5s to avoid large s.s. error due to windup at start of flight
+    if((this->get_clock()->now() - start_time_).seconds() >= 5.0){       
+        for(int i = 0; i < 3; i++) {
+            if (std::isfinite(eI_dt[i])) {
+                // clamp integral state to [-10, 10] to prevent too much windup
+                eI[i] = std::clamp(eI[i] + (eI_dt[i] * dt), -10.0, 10.0);
+            }
         }
     }
 
+    publish_inner_integral_debug(eI);
     publish_qsf_controller_output(sls_offset_params_.des_thrust, tau);
 
     // Normalize tau for torque and thrust setpoint to [-1, 1]
@@ -1133,6 +1154,19 @@ std::pair<Eigen::Vector3d, double> OffboardControl::attitude_to_body_rate_and_th
     //     | norm_thrust: %.3f | hover_param: %.3f", ref_acc(2), zb(2),
     //     desired_thrust, normalized_thrust, hover_thrust_);
     return {desired_rate, normalized_thrust};
+}
+
+void OffboardControl::publish_inner_integral_debug(const double eI[3]) {
+    geometry_msgs::msg::Vector3Stamped msg{};
+
+    msg.header.stamp = this->get_clock()->now();
+    msg.header.frame_id = "frd";
+
+    msg.vector.x = eI[0];
+    msg.vector.y = eI[1];
+    msg.vector.z = eI[2];
+
+    inner_integral_debug_publisher_->publish(msg);
 }
 
 void OffboardControl::publish_qsf_controller_output(double des_thrust, const double tau[3]) {
