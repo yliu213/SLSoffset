@@ -22,7 +22,7 @@ def generate_launch_description():
     use_ekf_arg = DeclareLaunchArgument(
             'use_ekf',
             default_value='false',
-            description='If true, use EKF2. If false, use groundtrtuth from Gazebo / Vicon.'
+            description='If true, use EKF2. If false, use groundtruth from Gazebo / Vicon.'
     )
     
     enable_viz_arg = DeclareLaunchArgument(
@@ -45,12 +45,12 @@ def generate_launch_description():
 
     kp_arg = DeclareLaunchArgument(
         "Kp",
-        default_value="2.0",
+        default_value="10.0",
         description="Proportional gain for the acceleration controller"
     )
     kv_arg = DeclareLaunchArgument(
         "Kv",
-        default_value="1.5",
+        default_value="5.0",
         description="Velocity gain for the acceleration controller"
     )
 

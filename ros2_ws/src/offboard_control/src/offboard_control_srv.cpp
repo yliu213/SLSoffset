@@ -64,11 +64,12 @@ class OffboardControl : public rclcpp::Node {
         mass_ = this->declare_parameter<double>("mass", mass_); // 2.0232 for sim, 2.093 for exp
         hover_thrust_ = this->declare_parameter<double>("hover_thrust", hover_thrust_);
         yaw_ = this->declare_parameter<double>("yaw_", 0.0);
-        attitude_tau_ = this->declare_parameter<double>("attitude_tau_", 0.1);                 // 0.3
-        norm_thrust_const_ = this->declare_parameter<double>("norm_thrust_const_", 0.034436);  //  0.009
-        norm_thrust_offset_ = this->declare_parameter<double>("norm_thrust_offset_", 0.14344); // 0.4
+        attitude_tau_ = this->declare_parameter<double>("attitude_tau_", 0.1);                 
+        norm_thrust_const_ = this->declare_parameter<double>("norm_thrust_const_", 0.03749);  // 0.034436
+        norm_thrust_offset_ = this->declare_parameter<double>("norm_thrust_offset_", 0.22043); // 0.14344
+        calib_thrust_ = this->declare_parameter<double>("calib_thrust_", 0.54);
         ref_rate_limit_ = this->declare_parameter<double>("ref_rate_limit_", 1);
-        att_control_type_ = this->declare_parameter<std::string>("att_control_type_", "QSF_offset");
+        att_control_type_ = this->declare_parameter<std::string>("att_control_type_", "Lee"); // "Default", "QSF_offset", "Lee" (For later)
 
         // QSF gains
         sls_offset_params_.Kx_int = this->declare_parameter<double>("Kx_int", 10.0000);
@@ -107,13 +108,13 @@ class OffboardControl : public rclcpp::Node {
         // 0 < cI < min(sqrt(kR/Iqxx)/Iqzz, 4*kR*kOmega/(4*kR*Iqzz + kOmega^2))
         kR_ = this->declare_parameter<double>("kR_", 5.0); // 5.0(sim), 2.5(exp)
         kOmega_ = this->declare_parameter<double>("kOmega_", 0.8); //0.8(sim), 0.35(exp)
-        kI_ = this->declare_parameter<double>("kI_", 0.1); // 0.1 try this with exp
-        cI_ = this->declare_parameter<double>("cI_", 0.5); // 0.5 try this with exp
+        kI_ = this->declare_parameter<double>("kI_", 0.0); // 0.1 
+        cI_ = this->declare_parameter<double>("cI_", 0.0); // 0.5 
 
         // SLS offset Max torque
         sls_offset_params_.tau_x_max_ = this->declare_parameter<double>("tau_x_max_", 4.15*2.21356); // 4.15*3.21356 for exp
         sls_offset_params_.tau_y_max_ = this->declare_parameter<double>("tau_y_max_", 4.15*2.21356);
-        sls_offset_params_.tau_z_max_ = this->declare_parameter<double>("tau_z_max_", 2.5); // 2.5 for exp, 0.35 for sim
+        sls_offset_params_.tau_z_max_ = this->declare_parameter<double>("tau_z_max_", 0.35); // 2.5 for exp, 0.35 for sim
 
         // Initialize gain matrices
         K_p_ = kp_ * Eigen::Matrix3d::Identity();
@@ -153,7 +154,7 @@ class OffboardControl : public rclcpp::Node {
 
                 if (is_offboard_) {
                     if (control_mode_ == "se3") {
-                        publish_se3_setpoint();
+                        // publish_se3_setpoint();
                     } else {
                         publish_trajectory_setpoint();
                     }
@@ -322,7 +323,7 @@ class OffboardControl : public rclcpp::Node {
     double mass_;
     double hover_thrust_;
     const double gravity_ = 9.8066;
-    std::string att_control_type_ = "Lee"; // "Default", "QSF_offset", "Lee" (For later)
+    std::string att_control_type_; // "Default", "QSF_offset", "Lee" (For later)
     double kR_;
     double kOmega_;
     double kI_;
@@ -349,13 +350,9 @@ class OffboardControl : public rclcpp::Node {
         double l = 0.75; // 0.92, Cable length
         double q_vec[3] = {0.0, 0.0, 0.0};
         double dq[3] = {0.0, 0.0, 0.0};
-        double L_offset_[3] = {0.12, -0.12, 0.06}; // Offset of load from UAV in meters (FRD) (x, -y, -z)
-        // double L_offset_[3] = {0.0, 0.0, 0.0};
+        // double L_offset_[3] = {0.12, -0.12, 0.06}; // Offset of load from UAV in meters (FRD) (x, -y, -z)
+        double L_offset_[3] = {0.0, 0.0, 0.0}; // for 0 offset or Lee's control
         double phi_rad_, theta_rad_, psi_rad_;
-        // double alpha, beta;                         // load angles
-        // double dalpha, dbeta;                       // load angle rates
-        // double alpha_prev = 0.0, beta_prev = 0.0;   // previous load angles
-        // double dalpha_prev = 0.0, dbeta_prev = 0.0; // previous load angle rates
         double tau_x_max_, tau_y_max_, tau_z_max_;
 
         // Inner loop tracking variables (if using thrust-torque control)
@@ -376,6 +373,9 @@ class OffboardControl : public rclcpp::Node {
         double q[3];
     };
 
+    // thrust calibration parameter
+    double calib_thrust_;
+
     // Attitude and Rate Mode Specific Parameters
     bool attitude_received_{false};
     double yaw_, ref_rate_limit_;
@@ -387,7 +387,7 @@ class OffboardControl : public rclcpp::Node {
     rcl_interfaces::msg::SetParametersResult parameters_callback(const std::vector<rclcpp::Parameter> &parameters);
     void publish_offboard_control_mode();
     void publish_trajectory_setpoint();
-    void publish_se3_setpoint();
+    void publish_se3_setpoint(sls_offset_params &sls_offset_params);
     void timer_callback(void);
     Eigen::Vector3d compute_acceleration_command(const Eigen::Vector3d &p, const Eigen::Vector3d &v, const Eigen::Vector3d &p_d, const Eigen::Vector3d &v_d, const Eigen::Vector3d &a_d);
 
@@ -462,6 +462,9 @@ rcl_interfaces::msg::SetParametersResult OffboardControl::parameters_callback(co
 
             flight_path_ = new_flight_path;
         }
+
+        else if (param.get_name() == "calib_thrust_")
+            calib_thrust_ = param.as_double();
 
         else if (param.get_name() == "Kx_int")
             sls_offset_params_.Kx_int = param.as_double();
@@ -569,7 +572,8 @@ void OffboardControl::publish_trajectory_setpoint() {
             std::tie(q_cmd, rate_thrust_cmd, torque_cmd) = apply_QSF_offset_ctrl(p_ref, v_ref, a_ref, j_ref, latest_ref_snap_);
         } else if (att_control_type_ == "Lee") {
             // apply Lee's geometric controller for torque mode
-            publish_se3_setpoint();
+            publish_se3_setpoint(sls_offset_params_);
+            return; // publishes torque/thrust directly
         } else {
             // Convert NED acceleration to ENU (X_enu = Y_ned, Y_enu = X_ned, Z_enu = -Z_ned)
             Eigen::Vector3d a_cmd_enu(a_cmd.y(), a_cmd.x(), -a_cmd.z());
@@ -637,9 +641,8 @@ void OffboardControl::publish_trajectory_setpoint() {
         msg.position = {static_cast<float>(p_ref.x() + sls_offset_params_.L_offset_[0]), static_cast<float>(p_ref.y() + sls_offset_params_.L_offset_[1]), static_cast<float>(p_ref.z() - sls_offset_params_.L_offset_[2] - sls_offset_params_.l)};
         msg.velocity = {static_cast<float>(v_ref.x()), static_cast<float>(v_ref.y()), static_cast<float>(v_ref.z())};
         msg.acceleration = {static_cast<float>(a_ref.x()), static_cast<float>(a_ref.y()), static_cast<float>(a_ref.z())};
-    } else if (control_mode_ == "torque" && attitude_received_ && (att_control_type_ == "QSF_offset")) {
-        // Currently only supports QSF offset control. If this changes later, this condition should be updated to allow other control types.
-        publish_torque_thrust_setpoints(torque_cmd, rate_thrust_cmd.second);
+    } else if (control_mode_ == "torque" && attitude_received_) {
+        publish_torque_thrust_setpoints(torque_cmd, rate_thrust_cmd.second && (att_control_type_ == "QSF_offset"));
         msg.position = {static_cast<float>(p_ref.x() + sls_offset_params_.L_offset_[0]), static_cast<float>(p_ref.y() + sls_offset_params_.L_offset_[1]), static_cast<float>(p_ref.z() - sls_offset_params_.L_offset_[2] - sls_offset_params_.l)};
         msg.velocity = {static_cast<float>(v_ref.x()), static_cast<float>(v_ref.y()), static_cast<float>(v_ref.z())};
         msg.acceleration = {static_cast<float>(a_ref.x()), static_cast<float>(a_ref.y()), static_cast<float>(a_ref.z())};
@@ -656,13 +659,14 @@ void OffboardControl::publish_trajectory_setpoint() {
 /**
  * @brief Publish the computed attitude setpoint using CTU-MRS' SE(3) controller
  */
-void OffboardControl::publish_se3_setpoint() {
+void OffboardControl::publish_se3_setpoint(OffboardControl::sls_offset_params &sls_offset_params) {
     if (!pos_received_ || !ref_received_ || !attitude_received_) return;
 
-    const Eigen::Vector3d p(latest_local_pos_.x, latest_local_pos_.y, latest_local_pos_.z);
-    const Eigen::Vector3d v(latest_local_pos_.vx, latest_local_pos_.vy, latest_local_pos_.vz);
-
+    Eigen::Vector3d p(sls_offset_params.latest_pos_enu_.y(), sls_offset_params.latest_pos_enu_.x(), -sls_offset_params.latest_pos_enu_.z());
+    Eigen::Vector3d v(sls_offset_params.latest_vel_enu_.y(), sls_offset_params.latest_vel_enu_.x(), -sls_offset_params.latest_vel_enu_.z());
+   
     Eigen::Vector3d p_ref(latest_ref_.position[0], latest_ref_.position[1], latest_ref_.position[2]);
+    p_ref.z() -= sls_offset_params_.l;
     Eigen::Vector3d v_ref(latest_ref_.velocity[0], latest_ref_.velocity[1], latest_ref_.velocity[2]);
     Eigen::Vector3d a_ref(latest_ref_.acceleration[0], latest_ref_.acceleration[1], latest_ref_.acceleration[2]);
     double yaw_ref = latest_ref_.yaw;
@@ -670,14 +674,9 @@ void OffboardControl::publish_se3_setpoint() {
     const Eigen::Vector3d e_p = p - p_ref;
     const Eigen::Vector3d e_v = v - v_ref;
 
-    // calculate desired force (NED Frame)
-    // gravity acts in +z
-    Eigen::Vector3d F_d = -K_p_*e_p - K_v_*e_v + mass_ * a_ref - Eigen::Vector3d(0.0, 0.0, mass_ * gravity_);
-
-    // map to normalized thrust
-    double thrust_mag = F_d.norm();
-    double norm_thrust = (thrust_mag / (mass_ * gravity_)) * hover_thrust_;
-    norm_thrust = std::clamp(norm_thrust, 0.0, 1.0);
+    // calculate desired force with integral (NED Frame)
+    e_p_int_ += e_p * dt;
+    Eigen::Vector3d F_d = -K_p_*e_p - K_v_*e_v - K_i_*e_p_int_ + mass_ * a_ref - Eigen::Vector3d(0.0, 0.0, mass_ * gravity_);
 
     // calculate desired attitude (rotation matrix)
     Eigen::Vector3d z_B = -F_d.normalized();
@@ -694,29 +693,32 @@ void OffboardControl::publish_se3_setpoint() {
     R_d.col(1) = y_B;
     R_d.col(2) = z_B;
 
-    // convert to quaternion
-    // Eigen::Quaterniond q_d(R_d);
-    // q_d.normalize();
-
-    // create attitude setpoint
-    // VehicleAttitudeSetpoint msg{};
-    // msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
-    // msg.q_d[0] = static_cast<float>(q_d.w());
-    // msg.q_d[1] = static_cast<float>(q_d.x());
-    // msg.q_d[2] = static_cast<float>(q_d.y());
-    // msg.q_d[3] = static_cast<float>(q_d.z());
-    // msg.thrust_body[0] = 0.0f;
-    // msg.thrust_body[1] = 0.0f;
-    // msg.thrust_body[2] = static_cast<float>(-norm_thrust);
-    // msg.yaw_sp_move_rate = 0.0f;
-    // attitude_setpoint_publisher_->publish(msg);
-
     // geometric torque control
+    Eigen::Quaterniond q_enu(latest_attitude_(0), latest_attitude_(1), latest_attitude_(2), latest_attitude_(3)); // w,x,y,z
+    Eigen::Quaterniond q_ned = px4_ros_com::frame_transforms::ros_to_px4_orientation(q_enu);
+    q_ned.normalize();
+    Eigen::Matrix3d R_ = q_ned.toRotationMatrix();
+    tf2::Quaternion q_uav(q_ned.x(),q_ned.y(),q_ned.z(),q_ned.w());
+    tf2::Matrix3x3 m_uav(q_uav);
+    m_uav.getRPY(sls_offset_params_.phi_rad_, sls_offset_params_.theta_rad_, sls_offset_params_.psi_rad_);
+
     sls_offset_params_.R_Bd = R_d;
-    double f = -F_d.dot(sls_offset_params_.R_Bd.col(2)); // f = -F_d R e3
-    double thrust_command = -f / mass_;
+    publish_qsf_attitude_debug(); // for debug publisher
+    double f = -F_d.dot(R_.col(2)); // f = -F_d R e3
+    sls_offset_params_.des_thrust = -f; // for debug publisher
+    double thrust_command = f / mass_;
     Eigen::Vector3d torque_cmd = sls_offset_thrust_torque_inner_loop(thrust_command);
-    publish_torque_thrust_setpoints(torque_cmd, thrust_command);
+
+    // use different drone mass in sdf and tune calib_thrust_ until acc = 0
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 200, "[Lee] z_err=%.3f", e_p.z());
+    // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 200, "[Lee] z=%.3f vz=%.3f", p.z(), v.z());
+    // sls_offset_params_.R_Bd << Eigen::Matrix3d::Identity(); // calibration test
+    // double calibration_thrust = std::clamp(calib_thrust_, 0.0, 1.0);
+    // publish_torque_thrust_setpoints(torque_cmd, calibration_thrust);
+
+    double normalized_thrust = norm_thrust_const_ * thrust_command + norm_thrust_offset_;
+    normalized_thrust = std::clamp(normalized_thrust, 0.0, 1.0);
+    publish_torque_thrust_setpoints(torque_cmd, normalized_thrust);
 }
 
 Eigen::Vector3d OffboardControl::compute_acceleration_command(const Eigen::Vector3d &p, const Eigen::Vector3d &v, const Eigen::Vector3d &p_d, const Eigen::Vector3d &v_d, const Eigen::Vector3d &a_d) {
