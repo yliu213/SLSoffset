@@ -53,7 +53,7 @@ class OffboardControl : public rclcpp::Node {
   public:
     OffboardControl(std::string px4_namespace)
         : Node("offboard_control_srv"), control_mode_("position"), 
-        kp_(2.0), kv_(1.5), mass_(2.0232), // 2.093 for exp, 2.0232 for sim
+        kp_(2.0), kv_(1.5), ki_(0.0), mass_(2.0232), // 2.093 for exp, 2.0232 for sim
         // make sure mass & hover thrust are defined                                                                 
         // before using the se3 controller
           hover_thrust_(0.5) {
@@ -61,7 +61,8 @@ class OffboardControl : public rclcpp::Node {
         control_mode_ = this->declare_parameter<std::string>("control_mode", control_mode_);
         kp_ = this->declare_parameter<double>("Kp", kp_);
         kv_ = this->declare_parameter<double>("Kv", kv_);
-        mass_ = this->declare_parameter<double>("mass", mass_); // 2.0232 for sim, 2.093 for exp
+        ki_ = this->declare_parameter<double>("Ki", ki_); // PID for Lee's control
+        mass_ = this->declare_parameter<double>("mass", mass_); 
         hover_thrust_ = this->declare_parameter<double>("hover_thrust", hover_thrust_);
         yaw_ = this->declare_parameter<double>("yaw_", 0.0);
         attitude_tau_ = this->declare_parameter<double>("attitude_tau_", 0.1);                 
@@ -119,6 +120,7 @@ class OffboardControl : public rclcpp::Node {
         // Initialize gain matrices
         K_p_ = kp_ * Eigen::Matrix3d::Identity();
         K_v_ = kv_ * Eigen::Matrix3d::Identity();
+        K_i_ = ki_ * Eigen::Matrix3d::Identity();
 
         // Initialize the flight path parameter
         flight_path_ = this->declare_parameter<std::string>("flight_path", "hover");
@@ -176,6 +178,7 @@ class OffboardControl : public rclcpp::Node {
                     RCLCPP_INFO(this->get_logger(), "Offboard mode engaged.");
                     start_time_ = this->now();
                     reset_qsf_integral_ = true;
+                    reset_position_integral_ = true;
                     reset_inner_integral_ = true; // Reset integral when entering offboard mode
                     RCLCPP_INFO(this->get_logger(), "Resetting integral state for QSF offset controller.");
                 } else if (!is_offboard_ && was_offboard) {
@@ -316,10 +319,16 @@ class OffboardControl : public rclcpp::Node {
     // Control Parameters
     std::string control_mode_;
     std::string flight_path_;
-    double kp_;
-    double kv_;
-    Eigen::Matrix3d K_p_;
-    Eigen::Matrix3d K_v_;
+
+    // Lee's PID control
+    double kp_,kv_,ki_;
+    Eigen::Matrix3d K_p_,K_v_,K_i_;    
+    Eigen::Vector3d position_integral_{Eigen::Vector3d::Zero()};
+    rclcpp::Time last_position_integral_time_;
+    bool first_position_integral_call_{true};
+    bool reset_position_integral_{false};
+    const double position_integral_limit_ = 1.0; // m*s, anti-windup
+
     double mass_;
     double hover_thrust_;
     const double gravity_ = 9.8066;
@@ -433,7 +442,15 @@ rcl_interfaces::msg::SetParametersResult OffboardControl::parameters_callback(co
         } else if (param.get_name() == "Kv") {
             kv_ = param.as_double();
             K_v_ = kv_ * Eigen::Matrix3d::Identity();
-        } else if (param.get_name() == "mass")
+        } else if (param.get_name() == "Ki") {
+            ki_ = param.as_double();
+            K_i_ = ki_ * Eigen::Matrix3d::Identity();
+            // avoid a thrust jump when changing/enabling Ki
+            position_integral_.setZero();
+            first_position_integral_call_ = true;
+        } 
+
+        else if (param.get_name() == "mass")
             mass_ = param.as_double();
         else if (param.get_name() == "hover_thrust")
             hover_thrust_ = param.as_double();
@@ -674,9 +691,29 @@ void OffboardControl::publish_se3_setpoint(OffboardControl::sls_offset_params &s
     const Eigen::Vector3d e_p = p - p_ref;
     const Eigen::Vector3d e_v = v - v_ref;
 
+    // Lee outer-loop position integral
+    if (reset_position_integral_) {
+        position_integral_.setZero();
+        first_position_integral_call_ = true;
+        reset_position_integral_ = false;
+    }
+    const rclcpp::Time now = this->now();
+    if (first_position_integral_call_) {
+        last_position_integral_time_ = now;
+        first_position_integral_call_ = false;
+    } else {
+        const double dt = std::clamp((now - last_position_integral_time_).seconds(),0.001, 0.025);
+        last_position_integral_time_ = now;
+        if (ki_ > 0.0) {
+            position_integral_ += e_p * dt;
+            for (int i = 0; i < 3; ++i) {
+                position_integral_[i] = std::clamp(position_integral_[i], -position_integral_limit_, position_integral_limit_);
+            }
+        }
+    }
+
     // calculate desired force with integral (NED Frame)
-    e_p_int_ += e_p * dt;
-    Eigen::Vector3d F_d = -K_p_*e_p - K_v_*e_v - K_i_*e_p_int_ + mass_ * a_ref - Eigen::Vector3d(0.0, 0.0, mass_ * gravity_);
+    Eigen::Vector3d F_d = -K_p_*e_p - K_v_*e_v - K_i_*position_integral_ + mass_ * a_ref - Eigen::Vector3d(0.0, 0.0, mass_ * gravity_);
 
     // calculate desired attitude (rotation matrix)
     Eigen::Vector3d z_B = -F_d.normalized();

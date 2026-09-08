@@ -8,6 +8,7 @@ def generate_launch_description():
     flight_path = LaunchConfiguration("flight_path")
     kp = LaunchConfiguration("Kp")
     kv = LaunchConfiguration("Kv")
+    ki = LaunchConfiguration("Ki")
     use_sim = LaunchConfiguration('use_sim')
     use_ekf = LaunchConfiguration('use_ekf')
 
@@ -36,6 +37,12 @@ def generate_launch_description():
         description="Velocity gain for the acceleration controller"
     )
 
+    ki_arg = DeclareLaunchArgument(
+        "Ki",
+        default_value="0.5",
+        description="Integral gain for the acceleration controller"
+    )
+
     use_sim_arg = DeclareLaunchArgument(
         'use_sim',
         default_value='true',
@@ -59,7 +66,8 @@ def generate_launch_description():
             "use_sim": use_sim,
             "use_ekf": use_ekf,
             "Kp": kp,
-            "Kv": kv
+            "Kv": kv,
+            "Ki": ki
         }],
     )
     
@@ -80,6 +88,7 @@ def generate_launch_description():
         flight_path_arg,
         kp_arg,
         kv_arg,
+        ki_arg,
         offboard_control_node,
         trajectory_publisher_node
     ])

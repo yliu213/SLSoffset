@@ -48,6 +48,11 @@ def generate_launch_description():
         default_value="10.0",
         description="Proportional gain for the acceleration controller"
     )
+    ki_arg = DeclareLaunchArgument(
+        "Ki",
+        default_value="1.0",
+        description="Integral gain for the acceleration controller"
+    )
     kv_arg = DeclareLaunchArgument(
         "Kv",
         default_value="5.0",
@@ -79,6 +84,7 @@ def generate_launch_description():
     flight_path = LaunchConfiguration("flight_path")
     kp = LaunchConfiguration("Kp")
     kv = LaunchConfiguration("Kv")
+    ki = LaunchConfiguration("Ki")
     
     hostname = LaunchConfiguration('hostname')
     buffer_size = LaunchConfiguration('buffer_size')
@@ -106,6 +112,7 @@ def generate_launch_description():
         flight_path_arg,
         kp_arg,
         kv_arg,
+        ki_arg,
         hostname_arg,
         buffer_size_arg,
         topic_namespace_arg,
@@ -138,7 +145,8 @@ def generate_launch_description():
                 "use_sim": use_sim,      # Passed directly to the C++ node
                 "use_ekf": use_ekf,
                 "Kp": kp,
-                "Kv": kv
+                "Kv": kv,
+                "Ki": ki
             }],
         ),
         
