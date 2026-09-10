@@ -664,8 +664,8 @@ void OffboardControl::publish_trajectory_setpoint() {
         msg.position = {static_cast<float>(p_ref.x() + sls_offset_params_.L_offset_[0]), static_cast<float>(p_ref.y() + sls_offset_params_.L_offset_[1]), static_cast<float>(p_ref.z() - sls_offset_params_.L_offset_[2] - sls_offset_params_.l)};
         msg.velocity = {static_cast<float>(v_ref.x()), static_cast<float>(v_ref.y()), static_cast<float>(v_ref.z())};
         msg.acceleration = {static_cast<float>(a_ref.x()), static_cast<float>(a_ref.y()), static_cast<float>(a_ref.z())};
-    } else if (control_mode_ == "torque" && attitude_received_) {
-        publish_torque_thrust_setpoints(torque_cmd, rate_thrust_cmd.second && (att_control_type_ == "QSF_offset"));
+    } else if (control_mode_ == "torque" && attitude_received_ && (att_control_type_ == "QSF_offset")) {
+        publish_torque_thrust_setpoints(torque_cmd, rate_thrust_cmd.second);
         msg.position = {static_cast<float>(p_ref.x() + sls_offset_params_.L_offset_[0]), static_cast<float>(p_ref.y() + sls_offset_params_.L_offset_[1]), static_cast<float>(p_ref.z() - sls_offset_params_.L_offset_[2] - sls_offset_params_.l)};
         msg.velocity = {static_cast<float>(v_ref.x()), static_cast<float>(v_ref.y()), static_cast<float>(v_ref.z())};
         msg.acceleration = {static_cast<float>(a_ref.x()), static_cast<float>(a_ref.y()), static_cast<float>(a_ref.z())};
