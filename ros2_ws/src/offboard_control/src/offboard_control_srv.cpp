@@ -107,15 +107,15 @@ class OffboardControl : public rclcpp::Node {
 
         // Geometric controller gains
         // 0 < cI < min(sqrt(kR/Iqxx)/Iqzz, 4*kR*kOmega/(4*kR*Iqzz + kOmega^2))
-        kR_ = this->declare_parameter<double>("kR_", 5.0); // 5.0(sim), 2.5(exp)
-        kOmega_ = this->declare_parameter<double>("kOmega_", 0.8); //0.8(sim), 0.35(exp)
+        kR_ = this->declare_parameter<double>("kR_", 2.5); // 5.0(sim), 2.5(exp)
+        kOmega_ = this->declare_parameter<double>("kOmega_", 0.35); //0.8(sim), 0.35(exp)
         kI_ = this->declare_parameter<double>("kI_", 0.0); // 0.1 
         cI_ = this->declare_parameter<double>("cI_", 0.0); // 0.5 
 
         // SLS offset Max torque
-        sls_offset_params_.tau_x_max_ = this->declare_parameter<double>("tau_x_max_", 4.15*2.21356); // 4.15*3.21356 for exp
-        sls_offset_params_.tau_y_max_ = this->declare_parameter<double>("tau_y_max_", 4.15*2.21356);
-        sls_offset_params_.tau_z_max_ = this->declare_parameter<double>("tau_z_max_", 0.35); // 2.5 for exp, 0.35 for sim
+        // sls_offset_params_.tau_x_max_ = this->declare_parameter<double>("tau_x_max_", 4.15*2.21356); // 4.15*3.21356 for exp
+        // sls_offset_params_.tau_y_max_ = this->declare_parameter<double>("tau_y_max_", 4.15*2.21356);
+        // sls_offset_params_.tau_z_max_ = this->declare_parameter<double>("tau_z_max_", 0.35); // 2.5 for exp, 0.35 for sim
 
         // Initialize gain matrices
         K_p_ = kp_ * Eigen::Matrix3d::Identity();
@@ -177,9 +177,10 @@ class OffboardControl : public rclcpp::Node {
                 if (is_offboard_ && !was_offboard) {
                     RCLCPP_INFO(this->get_logger(), "Offboard mode engaged.");
                     start_time_ = this->now();
+                    // Reset integral when entering offboard mode
                     reset_qsf_integral_ = true;
                     reset_position_integral_ = true;
-                    reset_inner_integral_ = true; // Reset integral when entering offboard mode
+                    reset_inner_integral_ = true; 
                     RCLCPP_INFO(this->get_logger(), "Resetting integral state for QSF offset controller.");
                 } else if (!is_offboard_ && was_offboard) {
                     RCLCPP_INFO(this->get_logger(), "Offboard mode disengaged.");
@@ -327,7 +328,7 @@ class OffboardControl : public rclcpp::Node {
     rclcpp::Time last_position_integral_time_;
     bool first_position_integral_call_{true};
     bool reset_position_integral_{false};
-    const double position_integral_limit_ = 1.0; // m*s, anti-windup
+    const double position_integral_limit_ = 5.0; // m*s, anti-windup
 
     double mass_;
     double hover_thrust_;
@@ -362,7 +363,7 @@ class OffboardControl : public rclcpp::Node {
         // double L_offset_[3] = {0.12, -0.12, 0.06}; // Offset of load from UAV in meters (FRD) (x, -y, -z)
         double L_offset_[3] = {0.0, 0.0, 0.0}; // for 0 offset or Lee's control
         double phi_rad_, theta_rad_, psi_rad_;
-        double tau_x_max_, tau_y_max_, tau_z_max_;
+        // double tau_x_max_, tau_y_max_, tau_z_max_;
 
         // Inner loop tracking variables (if using thrust-torque control)
         double Td_scaler = 1.0;
@@ -384,12 +385,15 @@ class OffboardControl : public rclcpp::Node {
 
     // thrust calibration parameter
     double calib_thrust_;
+    double norm_thrust_const_, norm_thrust_offset_;
+
+    // thrust and torque normalization parameters
+    double lee_sitl_normalized_thrust_{0.0};
 
     // Attitude and Rate Mode Specific Parameters
     bool attitude_received_{false};
     double yaw_, ref_rate_limit_;
     double attitude_tau_; // Attitude time constant for body rate control
-    double norm_thrust_const_, norm_thrust_offset_;
     Eigen::Vector4d latest_attitude_;
 
     // Methods
@@ -424,6 +428,7 @@ class OffboardControl : public rclcpp::Node {
     void publish_qsf_attitude_debug();
     void publish_qsf_controller_output(double des_thrust, const double tau[3]);
     void publish_inner_integral_debug(const double eI[3]);
+    std::pair<Eigen::Vector3d, double> f450_px4_inverse_sitl(const Eigen::Vector3d &tau_nm, double thrust_n); // F450 physical wrench -> PX4 normalized torque/thrust
 };
 
 /**
@@ -526,12 +531,12 @@ rcl_interfaces::msg::SetParametersResult OffboardControl::parameters_callback(co
         else if (param.get_name() == "use_ekf")
             use_ekf_ = param.as_bool();
 
-        else if (param.get_name() == "tau_x_max_")
-            sls_offset_params_.tau_x_max_ = param.as_double();
-        else if (param.get_name() == "tau_y_max_")
-            sls_offset_params_.tau_y_max_ = param.as_double();
-        else if (param.get_name() == "tau_z_max_")
-            sls_offset_params_.tau_z_max_ = param.as_double();
+        // else if (param.get_name() == "tau_x_max_")
+        //     sls_offset_params_.tau_x_max_ = param.as_double();
+        // else if (param.get_name() == "tau_y_max_")
+        //     sls_offset_params_.tau_y_max_ = param.as_double();
+        // else if (param.get_name() == "tau_z_max_")
+        //     sls_offset_params_.tau_z_max_ = param.as_double();
     }
     return result;
 }
@@ -691,7 +696,7 @@ void OffboardControl::publish_se3_setpoint(OffboardControl::sls_offset_params &s
     const Eigen::Vector3d e_p = p - p_ref;
     const Eigen::Vector3d e_v = v - v_ref;
 
-    // Lee outer-loop position integral
+    // Lee outer-loop position integral (linear)
     if (reset_position_integral_) {
         position_integral_.setZero();
         first_position_integral_call_ = true;
@@ -747,15 +752,21 @@ void OffboardControl::publish_se3_setpoint(OffboardControl::sls_offset_params &s
     Eigen::Vector3d torque_cmd = sls_offset_thrust_torque_inner_loop(thrust_command);
 
     // use different drone mass in sdf and tune calib_thrust_ until acc = 0
-    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 200, "[Lee] z_err=%.3f", e_p.z());
+    // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 200, "[Lee] z_err=%.3f", e_p.z());
     // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 200, "[Lee] z=%.3f vz=%.3f", p.z(), v.z());
     // sls_offset_params_.R_Bd << Eigen::Matrix3d::Identity(); // calibration test
     // double calibration_thrust = std::clamp(calib_thrust_, 0.0, 1.0);
     // publish_torque_thrust_setpoints(torque_cmd, calibration_thrust);
 
-    double normalized_thrust = norm_thrust_const_ * thrust_command + norm_thrust_offset_;
-    normalized_thrust = std::clamp(normalized_thrust, 0.0, 1.0);
-    publish_torque_thrust_setpoints(torque_cmd, normalized_thrust);
+    double normalized_thrust;
+    if (use_sim_ && att_control_type_ == "Lee") {
+        // Produced together with normalized torque by f450_px4_inverse_sitl()
+        normalized_thrust = lee_sitl_normalized_thrust_;
+    } else {
+        normalized_thrust = norm_thrust_const_ * thrust_command + norm_thrust_offset_;
+        normalized_thrust = std::clamp(normalized_thrust, 0.0, 1.0);
+    }
+    publish_torque_thrust_setpoints(torque_cmd, normalized_thrust); 
 }
 
 Eigen::Vector3d OffboardControl::compute_acceleration_command(const Eigen::Vector3d &p, const Eigen::Vector3d &v, const Eigen::Vector3d &p_d, const Eigen::Vector3d &v_d, const Eigen::Vector3d &a_d) {
@@ -971,14 +982,10 @@ std::tuple<Eigen::Vector4d, std::pair<Eigen::Vector3d, double>, Eigen::Vector3d>
 }
 
 Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thrust_command) {
-    // Angular velocites
     double Omega[3] = {sls_offset_params_.latest_rate_frd_.x(), sls_offset_params_.latest_rate_frd_.y(), sls_offset_params_.latest_rate_frd_.z()};
     double Omegad[3] = {sls_offset_params_.Omegad1, sls_offset_params_.Omegad2, sls_offset_params_.Omegad3};
     double dOmegad[3] = {sls_offset_params_.dOmegad1, sls_offset_params_.dOmegad2, sls_offset_params_.dOmegad3};
     double rpy_angles[3] = {sls_offset_params_.phi_rad_, sls_offset_params_.theta_rad_, sls_offset_params_.psi_rad_};
-    double taub[3], tau[3], rate_sp_dt[3], rate_sp_dt2[3];
-
-    // geometric PID control
     double q_vec_[3] = {sls_offset_params_.q_vec[0], sls_offset_params_.q_vec[1], sls_offset_params_.q_vec[2]};
     double dq_vec[3] = {sls_offset_params_.dq[0], sls_offset_params_.dq[1], sls_offset_params_.dq[2]};
     double gains[4] = {kR_, kOmega_, kI_, cI_};
@@ -993,9 +1000,7 @@ Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thru
 
     // reset integral if not in offboard mode
     if (reset_inner_integral_) {
-        for (int i = 0; i < 3; i++) {
-            eI[i] = 0.0;
-        }
+        for (int i = 0; i < 3; i++) eI[i] = 0.0;
         first_call_inner_loop_ = true;
         reset_inner_integral_ = false;
     } 
@@ -1009,46 +1014,379 @@ Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thru
         last_called_inner_loop_ = now;
     }
 
+    double taub[3], tau[3], rate_sp_dt[3], rate_sp_dt2[3];
     Inner_loop_geometric_PID(rpy_angles, q_vec_, dq_vec, Omega, sls_offset_params_.R_Bd.data(), Omegad, dOmegad, -mass_ * thrust_command, 
                              gains, physics_parameters, sls_offset_params_.L_offset_, eI, taub, tau, rate_sp_dt, rate_sp_dt2, eI_dt); 
 
     // accumlate integral after 5s to prevent inital error being mistaken as a persistent disturbance
     if((this->get_clock()->now() - start_time_).seconds() >= 5.0){       
         for(int i = 0; i < 3; i++) {
-            if (std::isfinite(eI_dt[i])) {
-                // clamp integral state to [-10, 10] to prevent too much windup
-                eI[i] = std::clamp(eI[i] + (eI_dt[i] * dt), -10.0, 10.0);
-            }
+            if (std::isfinite(eI_dt[i])) eI[i] = std::clamp(eI[i] + (eI_dt[i] * dt), -10.0, 10.0);
         }
     }
 
-    publish_inner_integral_debug(eI);
-    publish_qsf_controller_output(sls_offset_params_.des_thrust, tau);
+    publish_inner_integral_debug(eI); // eI debugger
+    publish_qsf_controller_output(sls_offset_params_.des_thrust, tau); // torque and thrust debugger
 
     // Normalize tau for torque and thrust setpoint to [-1, 1]
-    tau[0] = std::clamp(tau[0] / sls_offset_params_.tau_x_max_, -1.0, 1.0);
-    tau[1] = std::clamp(tau[1] / sls_offset_params_.tau_y_max_, -1.0, 1.0);
-    tau[2] = std::clamp(tau[2] / sls_offset_params_.tau_z_max_, -1.0, 1.0);
+    // tau[0] = std::clamp(tau[0] / sls_offset_params_.tau_x_max_, -1.0, 1.0);
+    // tau[1] = std::clamp(tau[1] / sls_offset_params_.tau_y_max_, -1.0, 1.0);
+    // tau[2] = std::clamp(tau[2] / sls_offset_params_.tau_z_max_, -1.0, 1.0);
 
-    Eigen::Vector3d tau_vec(tau[0], tau[1], tau[2]);
-    return tau_vec;
+    Eigen::Vector3d tau_raw(tau[0], tau[1], tau[2]); // [N m]
+    // thrust_command is acceleration [m/s^2].
+    // Convert it back to positive physical thrust [N].
+    const double thrust_n = mass_ * thrust_command; 
+    auto normalized = f450_px4_inverse_sitl(tau_raw, thrust_n);
+    lee_sitl_normalized_thrust_ = normalized.second;
+    return normalized.first;
+
+    // Eigen::Vector3d tau_vec(tau[0], tau[1], tau[2]);
+    // return tau_vec;
 }
 
-// std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d> OffboardControl::sls_offset_differential_flatness() {
+std::pair<Eigen::Vector3d, double> OffboardControl::f450_px4_inverse_sitl(const Eigen::Vector3d &tau_nm, double thrust_n) {
+    // ==================================================================================================
+    // https://github.com/SaxionMechatronics/px4_offboard_lowlevel/blob/main/src/controller_node.cpp#L286
+    // 
+    // F450 Gazebo physical motor model
+    //
+    // model.sdf:
+    //   rotor projected X/Y lever arm = 0.1626345596714 m
+    //   motorConstant                 = 1.2e-5
+    //   momentConstant                = 0.0137
+    //
+    // Physical rotor order in PX4 FRD:
+    //   0: Front Right, CCW, (+a, +a)
+    //   1: Back Left,   CCW, (-a, -a)
+    //   2: Front Left,  CW,  (+a, -a)
+    //   3: Back Right,  CW,  (-a, +a)
+    //
+    // Gazebo model itself is FLU, but after FLU -> FRD this rotor
+    // ordering/geometry matches the PX4 4201_gz_f450 airframe.
+    // ==================================================================================================
+
+    constexpr double a  = 0.1626345596714; // projected X/Y lever arm [m]
+    constexpr double kf = 1.2e-5;          // thrust_i = kf * omega_i^2
+    constexpr double km = 0.0137;          // yaw torque to thrust ratio, tau_yaw_i = km * thrust_i
+
+    // PX4 4201_gz_f450 airframe:
+    // SIM_GZ_EC_MIN1..4 = 150
+    // SIM_GZ_EC_MAX1..4 = 1000
+    constexpr double omega_min = 150.0;    // rad/s
+    constexpr double omega_max = 1000.0;   // rad/s
+    constexpr double omega_min_sq = omega_min * omega_min;
+    constexpr double omega_max_sq = omega_max * omega_max;
+    constexpr double output_range = omega_max - omega_min;
+
+    // =================================================================
+    // 1. Keep requested collective thrust inside physical motor limits.
+    //
+    // At zero torque all four motors have equal speed.
+    // =================================================================
+
+    constexpr double thrust_min = 4.0 * kf * omega_min_sq;
+    constexpr double thrust_max = 4.0 * kf * omega_max_sq;
+    const double thrust_requested = thrust_n;   // computed by outer-loop controller
+
+    thrust_n = std::clamp(thrust_n, thrust_min, thrust_max);
+
+    if (std::abs(thrust_n - thrust_requested) > 1e-6) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(),*this->get_clock(),1000,
+            "[F450 inverse] Thrust %.3f N outside feasible range "
+            "[%.3f, %.3f] N; clamped to %.3f N",
+            thrust_requested, thrust_min, thrust_max, thrust_n);
+    }
+
+    // ============================================================
+    // 2. Physical wrench -> omega^2
+    // 
+    // For the F450 rotor configuration:
+    // tau_x = y*Fz = y*kf*omega^2
+    // 
+    // tau_x = a*kf*(-w0^2 + w1^2 + w2^2 - w3^2)
+    // tau_y = a*kf*( w0^2 - w1^2 + w2^2 - w3^2)
+    // tau_z = km*kf*(w0^2 + w1^2 - w2^2 - w3^2)
+    // F = kf*(w0^2 + w1^2 + w2^2 + w3^2)
+    //
+    // alpha scales torque while leaving thrust unchanged.
+    // ============================================================
+
+    auto compute_omega_sq = [&](double alpha) -> Eigen::Vector4d {
+        const Eigen::Vector3d tau = alpha * tau_nm;
+
+        const double tx = tau.x() / (a * kf);
+        const double ty = tau.y() / (a * kf);
+        const double tz = tau.z() / (km * kf);
+        const double ft = thrust_n / kf;
+
+        Eigen::Vector4d omega_sq;
+        omega_sq[0] = 0.25 * (-tx + ty + tz + ft);
+        omega_sq[1] = 0.25 * ( tx - ty + tz + ft);
+        omega_sq[2] = 0.25 * ( tx + ty - tz + ft);
+        omega_sq[3] = 0.25 * (-tx - ty - tz + ft);
+
+        return omega_sq;
+    };
+
+    // ============================================================
+    // 3. Check whether a requested wrench is physically feasible.
+    //
+    // Unlike the previous implementation, DO NOT turn negative
+    // omega^2 into zero. Negative omega^2 means the desired wrench
+    // cannot be produced at the requested collective thrust.
+    // ============================================================
+
+    auto is_feasible = [&](const Eigen::Vector4d &omega_sq) -> bool {
+        for (int i = 0; i < 4; ++i) {
+            if (!std::isfinite(omega_sq[i])) {
+                return false;
+            }
+
+            if (omega_sq[i] < omega_min_sq || omega_sq[i] > omega_max_sq) {
+                return false;
+            }
+        }
+        return true;
+    };
+
+    // ============================================================
+    // 4. Try alpha = 1.0 first
+    // ============================================================
+    double alpha = 1.0; 
+    Eigen::Vector4d omega_sq = compute_omega_sq(alpha);
+
+    // ============================================================
+    // 5. If the requested torque is infeasible, preserve thrust
+    //    and find the largest feasible torque scaling.
+    //
+    // Since omega^2 depends linearly on alpha, and alpha=0 is the
+    // equal-speed collective-thrust operating point, binary search
+    // finds the largest feasible alpha in [0,1].
+    // ============================================================
+
+    if (!is_feasible(omega_sq)) {
+        const Eigen::Vector4d zero_torque_omega_sq = compute_omega_sq(0.0);
+
+        // This should only happen if something is fundamentally
+        // inconsistent with the thrust limits/model.
+        if (!is_feasible(zero_torque_omega_sq)) {
+
+            RCLCPP_ERROR_THROTTLE(this->get_logger(),*this->get_clock(),1000,
+                "[F450 inverse] Zero-torque wrench is infeasible "
+                "even after thrust limiting. "
+                "F=%.3f N, omega^2=[%.1f %.1f %.1f %.1f]",
+                thrust_n, zero_torque_omega_sq[0], zero_torque_omega_sq[1], zero_torque_omega_sq[2], zero_torque_omega_sq[3]);
+
+            // Conservative fallback:
+            // no torque, minimum normalized thrust.
+            return {Eigen::Vector3d::Zero(), 0.0};
+        }
+
+        double lo = 0.0;
+        double hi = 1.0;
+
+        // 40 iterations is far more precision than needed here.
+        for (int iter = 0; iter < 40; ++iter) {
+            const double mid = 0.5 * (lo + hi);
+            const Eigen::Vector4d candidate = compute_omega_sq(mid);
+
+            if (is_feasible(candidate)) {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+
+        alpha = lo;
+        omega_sq = compute_omega_sq(alpha);
+
+        RCLCPP_WARN_THROTTLE(this->get_logger(),*this->get_clock(),500,
+            "[F450 inverse] Torque request infeasible. "
+            "Scaling torque by alpha=%.4f. "
+            "tau_cmd=[%.3f %.3f %.3f] Nm",
+            alpha, tau_nm.x(), tau_nm.y(), tau_nm.z());
+    }
+
+    // =============================================================
+    // 6. omega^2 -> omega
+    //
+    // At this point all values should already be feasible.
+    // Clamp only protects against floating point error at the limit
+    // =============================================================
+
+    Eigen::Vector4d omega;
+    Eigen::Vector4d motor_norm;
+
+    for (int i = 0; i < 4; ++i) {
+        omega_sq[i] = std::clamp(omega_sq[i], omega_min_sq, omega_max_sq);
+        omega[i] = std::sqrt(omega_sq[i]);
+
+        // Saxion px4InverseSITL equivalent:
+        //
+        // normalized motor command =
+        //      (omega - SIM_GZ_EC_MIN)
+        //      -----------------------
+        //      (SIM_GZ_EC_MAX - MIN)
+        //
+        motor_norm[i] = (omega[i] - omega_min) / output_range;
+
+        // Numerical protection only.
+        motor_norm[i] = std::clamp(motor_norm[i], 0.0, 1.0);
+    }
+
+    // ============================================================
+    // 7. Invert PX4 v1.16.2 normalized F450 mixer
+    //
+    // This relation comes from the actual PX4 control-allocation
+    // geometry in 4201_gz_f450.
+    //
+    // Default rotor axis = [0, 0, -1]
+    //
+    // src/modules/control_allocator/module.yaml
+    // PX4 constructs each rotor effectiveness as:
+    // where CT is thrust coefficient of rotor i
+    //   thrust = CT * axis
+    //   moment = CT * position.cross(axis) - CT * KM * axis
+    //
+    // Since
+    //   position_frd = [x, y, 0]
+    //   axis_frd     = [0, 0, -1]
+    //
+    // then:
+    //   position.cross(axis) = [-y, +x, 0]
+    //
+    // Therefore each rotor contributes:
+    //   Mx = -CT * y
+    //   My = +CT * x
+    //   Mz = +CT * KM
+    //   Fz = -CT
+    //
+    // With CT = 6.5:
+    //   A = CT * 0.159 = 1.0335
+    //   B = CT * 0.014 = 0.091
+    //   C = CT         = 6.5
+    //
+    // The physical PX4 effectiveness matrix is:
+    //
+    //             motor0   motor1   motor2   motor3
+    //
+    //   Mx       -A       +A       +A       -A
+    //   My       +A       -A       +A       -A
+    //   Mz       +B       +B       -B       -B
+    //   Fz       -C       -C       -C       -C
+    //
+    // i.e.
+    //   
+    //   B_CA =
+    //
+    //   [ -1.0335, +1.0335, +1.0335, -1.0335 ]
+    //   [ +1.0335, -1.0335, +1.0335, -1.0335 ]
+    //   [ +0.0910, +0.0910, -0.0910, -0.0910 ]
+    //   [ -6.5000, -6.5000, -6.5000, -6.5000 ]
+    //
+    // PX4 computes the pseudoinverse of this effectiveness matrix,
+    // then normalizes the roll/pitch/yaw/thrust columns (ControlAllocationPseudoInverse.cpp)
+    //
+    // After PX4 normalization:
+    //
+    //   roll/pitch coefficient = 1/sqrt(2) = 0.70710678
+    //   yaw coefficient        = 1
+    //   thrust coefficient     = -1
+    //
+    // Therefore the normalized PX4 mixer is:
+    //
+    // Let:
+    //   r  = 1/sqrt(2)
+    //   ux = normalized roll torque
+    //   uy = normalized pitch torque
+    //   uz = normalized yaw torque
+    //   Fz = normalized body-Z thrust
+    //
+    // Then:
+    //   m0 = -r*ux + r*uy + uz - Fz
+    //   m1 =  r*ux - r*uy + uz - Fz
+    //   m2 =  r*ux + r*uy - uz - Fz
+    //   m3 = -r*ux - r*uy - uz - Fz
+    //
+    // PX4 uses negative body-Z for upward thrust:
+    //
+    //   Fz = -thrust_norm
+    //
+    // so equivalently:
+    //
+    //   m0 = -r*ux + r*uy + uz + thrust_norm
+    //   m1 =  r*ux - r*uy + uz + thrust_norm
+    //   m2 =  r*ux + r*uy - uz + thrust_norm
+    //   m3 = -r*ux - r*uy - uz + thrust_norm
+    //
+    // Solving these four equations for the normalized controls:
+    //
+    //   ux = (-m0 + m1 + m2 - m3) / (2*sqrt(2))
+    //   uy = ( m0 - m1 + m2 - m3) / (2*sqrt(2))
+    //   uz = ( m0 + m1 - m2 - m3) / 4
+    //   thrust_norm = (m0 + m1 + m2 + m3) / 4
+    //
+    // This is why the equations below convert our normalized motor
+    // commands back into the VehicleTorqueSetpoint and
+    // VehicleThrustSetpoint values expected by PX4.
+    //
+    // IMPORTANT:
+    //   model.sdf physical parameters are used earlier for:
+    //
+    //       physical wrench [Nm,N] -> physical rotor omega
+    //
+    //   PX4 airframe/control-allocation geometry is used here for:
+    //
+    //       normalized rotor command -> normalized PX4 torque/thrust setpoint
+    //
+    // These are intentionally two separate models.
+    // ============================================================
+
+    constexpr double inv_2sqrt2 = 0.35355339059327376220; // 1/(2*sqrt(2))
+
+    Eigen::Vector3d torque_norm;
+    torque_norm.x() = (-motor_norm[0] + motor_norm[1] + motor_norm[2] - motor_norm[3]) * inv_2sqrt2;
+    torque_norm.y() = ( motor_norm[0] - motor_norm[1] + motor_norm[2] - motor_norm[3]) * inv_2sqrt2;
+    torque_norm.z() = 0.25 * ( motor_norm[0] + motor_norm[1] - motor_norm[2] - motor_norm[3]);
+    const double thrust_norm = 0.25 * (motor_norm[0] + motor_norm[1] + motor_norm[2] + motor_norm[3]);
+
+    // ============================================================
+    // 8. Reconstruct the actual physical wrench requested from
+    //    the selected rotor speeds. This is debug verification.
+    // ============================================================
+
+    const double reconstructed_tx = a * kf * (-omega_sq[0] + omega_sq[1] + omega_sq[2] - omega_sq[3]);
+    const double reconstructed_ty = a * kf * ( omega_sq[0] - omega_sq[1] + omega_sq[2] - omega_sq[3]);
+    const double reconstructed_tz = km * kf * ( omega_sq[0] + omega_sq[1] - omega_sq[2] - omega_sq[3]);
+    const double reconstructed_thrust = kf * omega_sq.sum();
+
+    // ============================================================
+    // 9. Debug output
+    // ============================================================
+
+    RCLCPP_INFO_THROTTLE(this->get_logger(),*this->get_clock(),500,
+        "[F450 inverse] "
+        "alpha=%.3f "
+        "tauCmd=[%.3f %.3f %.3f] "
+        "tauReal=[%.3f %.3f %.3f] "
+        "Fcmd=%.3f Freal=%.3f "
+        "omega=[%.1f %.1f %.1f %.1f] "
+        "uTau=[%.3f %.3f %.3f] uT=%.3f",
+        alpha, tau_nm.x(), tau_nm.y(), tau_nm.z(),
+        reconstructed_tx, reconstructed_ty, reconstructed_tz,
+        thrust_n, reconstructed_thrust,
+        omega[0], omega[1], omega[2], omega[3], 
+        torque_norm.x(), torque_norm.y(), torque_norm.z(), thrust_norm);
+
+    return {torque_norm, thrust_norm};
+}
+
 void OffboardControl::sls_offset_differential_flatness() {
     // fig8
     double t = this->get_clock()->now().seconds() - start_time_.seconds(); // clock from publisher
-    // double T = 42.0; // T = 42.0 -> 0.1496 & 0.2292 hz
-    // double A = 1.5;
-    // double B = 1.0;
-    // xpd = A * sin(2 * M_PI * t / T);
-    // ypd = B * sin(4 * M_PI * t / T);
-    // zpd = -1.0;
     double Od[3], dOd[3], ddRL[3];
     // double xipd[3], dxipd[3], d2xipd[3], d3xipd[3], d4xipd[3];
-    // diff_flatness_fig8_QSF(t, mp, mq, l, g, psi_rad_, L_offset_,
-    //                         T, A, B, Od, dOd, dxipd,
-    //                         d2xipd, d3xipd, d4xipd, ddRL);
     // diff_flatness_mission_QSF(t, sls_offset_params_.load_mass_, mass_, sls_offset_params_.l, gravity_, sls_offset_params_.psi_rad_, sls_offset_params_.L_offset_, T, A, B, Od, dOd, xipd, dxipd, d2xipd,
     //                           d3xipd, d4xipd, ddRL, &sls_offset_params_.Td_scaler);
 
@@ -1079,8 +1417,6 @@ void OffboardControl::sls_offset_differential_flatness() {
     // Eigen::Vector3d acc_des(d2xipd[0], d2xipd[1], d2xipd[2]);
     // Eigen::Vector3d jerk_des(d3xipd[0], d3xipd[1], d3xipd[2]);
     // Eigen::Vector3d snap_des(d4xipd[0], d4xipd[1], d4xipd[2]);
-
-    // return {pos_des, vel_des, acc_des, jerk_des, snap_des};
 }
 
 std::pair<Eigen::Vector3d, double> OffboardControl::sls_offset_attitude_to_body_rate_and_thrust(const Eigen::Vector4d &curr_att, const Eigen::Vector4d &ref_att, double ref_z_thrust) {

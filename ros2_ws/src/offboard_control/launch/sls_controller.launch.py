@@ -45,7 +45,7 @@ def generate_launch_description():
 
     kp_arg = DeclareLaunchArgument(
         "Kp",
-        default_value="10.0",
+        default_value="5.0",
         description="Proportional gain for the acceleration controller"
     )
     ki_arg = DeclareLaunchArgument(
@@ -55,7 +55,7 @@ def generate_launch_description():
     )
     kv_arg = DeclareLaunchArgument(
         "Kv",
-        default_value="5.0",
+        default_value="2.0",
         description="Velocity gain for the acceleration controller"
     )
 
