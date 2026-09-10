@@ -759,13 +759,12 @@ void OffboardControl::publish_se3_setpoint(OffboardControl::sls_offset_params &s
     // publish_torque_thrust_setpoints(torque_cmd, calibration_thrust);
 
     double normalized_thrust;
-    if (use_sim_ && att_control_type_ == "Lee") {
-        // Produced together with normalized torque by f450_px4_inverse_sitl()
-        normalized_thrust = lee_sitl_normalized_thrust_;
-    } else {
-        normalized_thrust = norm_thrust_const_ * thrust_command + norm_thrust_offset_;
-        normalized_thrust = std::clamp(normalized_thrust, 0.0, 1.0);
-    }
+    // normalized_thrust = norm_thrust_const_ * thrust_command + norm_thrust_offset_;
+    // normalized_thrust = std::clamp(normalized_thrust, 0.0, 1.0);
+
+    // Produced together with normalized torque by f450_px4_inverse_sitl()
+    normalized_thrust = lee_sitl_normalized_thrust_;
+
     publish_torque_thrust_setpoints(torque_cmd, normalized_thrust); 
 }
 
