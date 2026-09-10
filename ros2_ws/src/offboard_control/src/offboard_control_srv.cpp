@@ -429,6 +429,7 @@ class OffboardControl : public rclcpp::Node {
     void publish_qsf_controller_output(double des_thrust, const double tau[3]);
     void publish_inner_integral_debug(const double eI[3]);
     std::pair<Eigen::Vector3d, double> f450_px4_inverse_sitl(const Eigen::Vector3d &tau_nm, double thrust_n); // F450 physical wrench -> PX4 normalized torque/thrust
+    std::pair<Eigen::Vector3d, double> f450_px4_inverse_experiment(const Eigen::Vector3d &tau_nm, double thrust_n);
 };
 
 /**
@@ -752,7 +753,7 @@ void OffboardControl::publish_se3_setpoint(OffboardControl::sls_offset_params &s
     Eigen::Vector3d torque_cmd = sls_offset_thrust_torque_inner_loop(thrust_command);
 
     // use different drone mass in sdf and tune calib_thrust_ until acc = 0
-    // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 200, "[Lee] z_err=%.3f", e_p.z());
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 200, "[Lee] z_err=%.3f", e_p.z());
     // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 200, "[Lee] z=%.3f vz=%.3f", p.z(), v.z());
     // sls_offset_params_.R_Bd << Eigen::Matrix3d::Identity(); // calibration test
     // double calibration_thrust = std::clamp(calib_thrust_, 0.0, 1.0);
@@ -760,6 +761,7 @@ void OffboardControl::publish_se3_setpoint(OffboardControl::sls_offset_params &s
 
     double normalized_thrust;
     // normalized_thrust = norm_thrust_const_ * thrust_command + norm_thrust_offset_;
+    // normalized_thrust =  -0.0009405*thrust_command*thrust_command + 0.05662*thrust_command + 0.12421;
     // normalized_thrust = std::clamp(normalized_thrust, 0.0, 1.0);
 
     // Produced together with normalized torque by f450_px4_inverse_sitl()
@@ -1036,12 +1038,434 @@ Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thru
     // thrust_command is acceleration [m/s^2].
     // Convert it back to positive physical thrust [N].
     const double thrust_n = mass_ * thrust_command; 
-    auto normalized = f450_px4_inverse_sitl(tau_raw, thrust_n);
+
+    std::pair<Eigen::Vector3d, double> normalized;
+    // if (use_sim_){
+    //     normalized = f450_px4_inverse_sitl(tau_raw, thrust_n);
+    // } else {
+        normalized = f450_px4_inverse_experiment(tau_raw, thrust_n);
+    // }
     lee_sitl_normalized_thrust_ = normalized.second;
     return normalized.first;
 
     // Eigen::Vector3d tau_vec(tau[0], tau[1], tau[2]);
     // return tau_vec;
+}
+
+std::pair<Eigen::Vector3d, double> OffboardControl::f450_px4_inverse_experiment(const Eigen::Vector3d &tau_nm, double thrust_n) {
+    // ============================================================
+    // PHYSICAL EXPERIMENT PARAMETERS
+    // ============================================================
+
+    constexpr double mass_exp = 2.093;   // [kg] PHYSICAL EXPERIMENT VALUE
+    constexpr double arm = 0.160;        // [m] PHYSICAL MEASURED/APPROX VALUE, projected X/Y lever arm
+
+    // ------------------------------------------------------------
+    // TEMPORARY SIM-DERIVED PARAMETER
+    //
+    // This is NOT identified from the physical propulsion system.
+    // It is copied from the Gazebo model and should eventually be
+    // replaced by a measured/identified yaw moment-to-thrust ratio.
+    // ------------------------------------------------------------
+    constexpr double km = 0.0137;        // [m] sim value as a try
+
+    // ------------------------------------------------------------
+    // TEMPORARY SIM-CALIBRATED THRUST CURVE
+    //
+    // Existing fitted relation:
+    //
+    //   u = c2*x^2 + c1*x + c0
+    //
+    // where:
+    //   x = equivalent total specific thrust [m/s^2]
+    //   u = normalized PX4 motor command
+    //
+    // This curve was identified in SITL.
+    // It is being used provisionally for the physical experiment.
+    // ------------------------------------------------------------
+    constexpr double c2 = -0.0009405;    // *** FROM SITL CALIBRATION ***
+    constexpr double c1 =  0.05662;      // *** FROM SITL CALIBRATION ***
+    constexpr double c0 =  0.12421;      // *** FROM SITL CALIBRATION ***
+
+    // Physical PX4 output configuration:
+    //
+    // PWM_MAIN_MIN = 1100
+    // PWM_MAIN_MAX = 1900
+    //
+    // We do NOT explicitly convert normalized motor command to PWM
+    // here. PX4 does that later.
+    constexpr double motor_norm_min = 0.0;
+    constexpr double motor_norm_max = 1.0;
+
+
+    // ============================================================
+    // 1. Basic thrust protection
+    // ============================================================
+
+    thrust_n = std::max(thrust_n, 0.0);
+
+    // ============================================================
+    // 2. Physical wrench -> individual motor thrusts
+    //
+    // Rotor order matches the physical PX4 configuration:
+    //
+    // rotor 0: Front Right  (+x,+y), positive yaw sign
+    // rotor 1: Back Left    (-x,-y), positive yaw sign
+    // rotor 2: Front Left   (+x,-y), negative yaw sign
+    // rotor 3: Back Right   (-x,+y), negative yaw sign
+    //
+    // Physical equations:
+    //
+    // tau_x = -a*f0 + a*f1 + a*f2 - a*f3
+    // tau_y =  a*f0 - a*f1 + a*f2 - a*f3
+    // tau_z = km*f0 + km*f1 - km*f2 - km*f3
+    // F     = f0 + f1 + f2 + f3
+    //
+    // alpha scales torque while preserving collective thrust.
+    // ============================================================
+
+    auto compute_motor_thrust = [&](double alpha) -> Eigen::Vector4d {
+        const Eigen::Vector3d tau =alpha * tau_nm;
+        const double tx = tau.x() / arm;
+        const double ty = tau.y() / arm;
+        const double tz = tau.z() / km;
+
+        Eigen::Vector4d f;
+        f[0] = 0.25 * (-tx + ty + tz + thrust_n);
+        f[1] = 0.25 * ( tx - ty + tz + thrust_n);
+        f[2] = 0.25 * ( tx + ty - tz + thrust_n);
+        f[3] = 0.25 * (-tx - ty - tz + thrust_n);
+        return f;
+    };
+
+
+    // ============================================================
+    // 3. Convert requested single-motor thrust [N] into the
+    //    normalized motor command using the provisional curve.
+    //
+    // Your fitted curve was based on whole-vehicle specific thrust:
+    //
+    //      x = F_total / mass
+    //
+    // For one motor producing fi, the equivalent equal-motor total
+    // thrust is:
+    //
+    //      F_equiv = 4*fi
+    //
+    // therefore:
+    //
+    //      x_i = 4*fi / mass
+    //
+    // ============================================================
+
+    auto thrust_to_motor_norm = [&](double motor_thrust_n) -> double {
+        if (motor_thrust_n < 0.0) {
+            return -1.0; // mark infeasible
+        }
+
+        const double x = 4.0 * motor_thrust_n / mass_exp;
+        const double u = c2 * x * x + c1 * x + c0;
+
+        return u;
+    };
+
+
+    // ============================================================
+    // 4. Check whether all four motor thrust commands are physically
+    //    usable by the current provisional model.
+    //
+    // Important:
+    //   Negative motor thrust is impossible.
+    //   u outside [0,1] cannot be represented by PX4.
+    //
+    // Because the fitted SITL curve is only provisional, this does
+    // NOT prove the real motor can generate the requested thrust.
+    // ============================================================
+
+    auto is_feasible =
+        [&](const Eigen::Vector4d &motor_thrust) -> bool
+    {
+        for (int i = 0; i < 4; ++i) {
+
+            if (!std::isfinite(motor_thrust[i])) {
+                return false;
+            }
+
+            if (motor_thrust[i] < 0.0) {
+                return false;
+            }
+
+            const double u =
+                thrust_to_motor_norm(motor_thrust[i]);
+
+            if (!std::isfinite(u) ||
+                u < motor_norm_min ||
+                u > motor_norm_max) {
+                return false;
+            }
+        }
+
+        return true;
+    };
+
+
+    // ============================================================
+    // 5. Try full torque first.
+    // ============================================================
+
+    double alpha = 1.0;
+
+    Eigen::Vector4d motor_thrust =
+        compute_motor_thrust(alpha);
+
+
+    // ============================================================
+    // 6. If torque request is infeasible, preserve collective
+    //    thrust and reduce torque uniformly.
+    // ============================================================
+
+    if (!is_feasible(motor_thrust)) {
+
+        const Eigen::Vector4d zero_torque_motor_thrust =
+            compute_motor_thrust(0.0);
+
+        if (!is_feasible(zero_torque_motor_thrust)) {
+
+            RCLCPP_ERROR_THROTTLE(
+                this->get_logger(),
+                *this->get_clock(),
+                1000,
+                "[F450 EXP inverse] "
+                "Zero-torque collective thrust is infeasible. "
+                "Fcmd=%.3f N",
+                thrust_n);
+
+            return {
+                Eigen::Vector3d::Zero(),
+                0.0
+            };
+        }
+
+        double lo = 0.0;
+        double hi = 1.0;
+
+        for (int iter = 0; iter < 40; ++iter) {
+
+            const double mid =
+                0.5 * (lo + hi);
+
+            const Eigen::Vector4d candidate =
+                compute_motor_thrust(mid);
+
+            if (is_feasible(candidate)) {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+
+        alpha = lo;
+
+        motor_thrust =
+            compute_motor_thrust(alpha);
+
+        RCLCPP_WARN_THROTTLE(
+            this->get_logger(),
+            *this->get_clock(),
+            500,
+            "[F450 EXP inverse] "
+            "Torque request infeasible. "
+            "Scaling torque by alpha=%.4f. "
+            "tauCmd=[%.3f %.3f %.3f] Nm",
+            alpha,
+            tau_nm.x(),
+            tau_nm.y(),
+            tau_nm.z());
+    }
+
+
+    // ============================================================
+    // 7. Individual physical thrust -> normalized motor commands
+    //
+    // NOTE:
+    //
+    // motor_norm here represents the PX4 normalized actuator motor
+    // command. PX4 will later map this to physical PWM:
+    //
+    //      0 -> PWM_MAIN_MIN = 1100 us
+    //      1 -> PWM_MAIN_MAX = 1900 us
+    //
+    // PWM_MAIN_DIS = 1000 is the disarmed value and is not used here.
+    // ============================================================
+
+    Eigen::Vector4d motor_norm;
+
+    for (int i = 0; i < 4; ++i) {
+
+        motor_norm[i] =
+            thrust_to_motor_norm(
+                motor_thrust[i]);
+
+        motor_norm[i] =
+            std::clamp(
+                motor_norm[i],
+                motor_norm_min,
+                motor_norm_max);
+    }
+
+
+    // ============================================================
+    // 8. Motor normalized commands -> PX4 normalized
+    //    torque/thrust setpoints
+    //
+    // This corresponds to the physical PX4 rotor arrangement in
+    // qf450_qgc_exp.params:
+    //
+    // rotor0 (+x,+y,+KM)
+    // rotor1 (-x,-y,+KM)
+    // rotor2 (+x,-y,-KM)
+    // rotor3 (-x,+y,-KM)
+    //
+    // The physical file has:
+    //   CA_ROTOR_COUNT = 4               line 229
+    //   rotor 0 geometry                 lines 133-140
+    //   rotor 1 geometry                 lines 157-164
+    //   rotor 2 geometry                 lines 165-172
+    //   rotor 3 geometry                 lines 173-180
+    //
+    // Therefore the same normalized inverse mixer structure used
+    // in SITL can be used here.
+    // ============================================================
+
+    constexpr double inv_2sqrt2 =
+        0.35355339059327376220;
+
+    Eigen::Vector3d torque_norm;
+
+    torque_norm.x() =
+        (-motor_norm[0]
+         + motor_norm[1]
+         + motor_norm[2]
+         - motor_norm[3])
+        * inv_2sqrt2;
+
+    torque_norm.y() =
+        ( motor_norm[0]
+         - motor_norm[1]
+         + motor_norm[2]
+         - motor_norm[3])
+        * inv_2sqrt2;
+
+    torque_norm.z() =
+        0.25 *
+        ( motor_norm[0]
+        + motor_norm[1]
+        - motor_norm[2]
+        - motor_norm[3]);
+
+    double thrust_norm =
+        0.25 *
+        ( motor_norm[0]
+        + motor_norm[1]
+        + motor_norm[2]
+        + motor_norm[3]);
+
+
+    // ============================================================
+    // 9. Reconstruct the physical wrench BEFORE the empirical
+    //    motor curve.
+    //
+    // This checks the physical allocation math itself.
+    // ============================================================
+
+    const double tau_real_x =
+        arm *
+        (-motor_thrust[0]
+         + motor_thrust[1]
+         + motor_thrust[2]
+         - motor_thrust[3]);
+
+    const double tau_real_y =
+        arm *
+        ( motor_thrust[0]
+         - motor_thrust[1]
+         + motor_thrust[2]
+         - motor_thrust[3]);
+
+    const double tau_real_z =
+        km *
+        ( motor_thrust[0]
+        + motor_thrust[1]
+        - motor_thrust[2]
+        - motor_thrust[3]);
+
+    const double thrust_real =
+        motor_thrust.sum();
+
+
+    // ============================================================
+    // 10. Debug information
+    //
+    // SIM-DERIVED values currently used:
+    //
+    //     km = 0.0137
+    //
+    // SIM-CALIBRATED values currently used:
+    //
+    //     c2 = -0.0009405
+    //     c1 =  0.05662
+    //     c0 =  0.12421
+    //
+    // Everything else in this method is based on physical aircraft
+    // configuration / experiment parameters.
+    // ============================================================
+
+    RCLCPP_INFO_THROTTLE(
+        this->get_logger(),
+        *this->get_clock(),
+        500,
+        "[F450 EXP inverse] "
+        "alpha=%.3f "
+        "tauCmd=[%.3f %.3f %.3f] "
+        "tauAlloc=[%.3f %.3f %.3f] "
+        "Fcmd=%.3f Falloc=%.3f "
+        "motorF=[%.3f %.3f %.3f %.3f] "
+        "motorU=[%.3f %.3f %.3f %.3f] "
+        "uTau=[%.3f %.3f %.3f] "
+        "uT=%.3f",
+        alpha,
+
+        tau_nm.x(),
+        tau_nm.y(),
+        tau_nm.z(),
+
+        tau_real_x,
+        tau_real_y,
+        tau_real_z,
+
+        thrust_n,
+        thrust_real,
+
+        motor_thrust[0],
+        motor_thrust[1],
+        motor_thrust[2],
+        motor_thrust[3],
+
+        motor_norm[0],
+        motor_norm[1],
+        motor_norm[2],
+        motor_norm[3],
+
+        torque_norm.x(),
+        torque_norm.y(),
+        torque_norm.z(),
+
+        thrust_norm);
+
+    return {
+        torque_norm,
+        thrust_norm
+    };
 }
 
 std::pair<Eigen::Vector3d, double> OffboardControl::f450_px4_inverse_sitl(const Eigen::Vector3d &tau_nm, double thrust_n) {
